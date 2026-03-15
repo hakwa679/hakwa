@@ -1,6 +1,12 @@
 {
     "name": "@hakwa/db",
+    "version": "1.0.0",
     "type": "module",
+    "exports": {
+        ".": "./index.ts",
+        "./schema": "./schema/index.ts"
+    },
+    "types": "./index.ts",
     "scripts": {
         "migrate": "drizzle-kit generate --out ./migrations",
         "push": "drizzle-kit push"

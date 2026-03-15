@@ -5,11 +5,12 @@
     "description": "An evolving platform",
     "workspaces": [
         "pkg/*",
-        "api/*",
+        "api",
         "apps/*"
     ],
     "scripts": {
-        "db-push": "npm run push -w @hakwa/db"
+        "db-push": "npm run push -w @hakwa/db",
+        "api-dev": "npm run dev -w @hakwa/api"
     },
     "devDependencies": {
         "typescript": "^5.9.3"

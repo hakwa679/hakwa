@@ -1,0 +1,8 @@
+{
+    "name": "@hakwa/auth",
+    "type": "module",
+    "dependencies": {
+        "@hakwa/db": "^1.0.0",
+        "better-auth": "^1.5.5"
+    }
+}

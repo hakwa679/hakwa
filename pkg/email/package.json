@@ -1,0 +1,10 @@
+{
+    "name": "@hakwa/email",
+    "type": "module",
+    "dependencies": {
+        "nodemailer": "^8.0.2"
+    },
+    "devDependencies": {
+        "@types/nodemailer": "^7.0.11"
+    }
+}
