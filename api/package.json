@@ -1,0 +1,15 @@
+{
+  "name": "@hakwa/api",
+  "version": "1.0.0",
+  "description": "API for the Hakwa platform",
+  "keywords": [
+    "hakwa"
+  ],
+  "license": "ISC",
+  "author": "Taia Tiniyara",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  }
+}

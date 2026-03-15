@@ -1,0 +1,17 @@
+{
+    "name": "hakwa",
+    "version": "1.0.0",
+    "private": true,
+    "description": "An evolving platform",
+    "workspaces": [
+        "pkg/*",
+        "api/*",
+        "apps/*"
+    ],
+    "scripts": {
+        "db-push": "npm run push -w @hakwa/db"
+    },
+    "devDependencies": {
+        "typescript": "^5.9.3"
+    }
+}
