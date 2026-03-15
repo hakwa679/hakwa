@@ -1,2 +1,2 @@
-export { default } from "./connection.js";
-export * from "./schema/index.js";
+export { default } from "./connection.ts";
+export * from "./schema/index.ts";

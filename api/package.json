@@ -14,6 +14,7 @@
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
+    "@hakwa/auth": "*",
     "@hakwa/db": "*",
     "@hakwa/email": "*",
     "dotenv": "^17.3.1",

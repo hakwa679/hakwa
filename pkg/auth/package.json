@@ -3,6 +3,7 @@
     "type": "module",
     "dependencies": {
         "@hakwa/db": "^1.0.0",
+        "@hakwa/email": "*",
         "better-auth": "^1.5.5"
     }
 }

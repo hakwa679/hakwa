@@ -1,7 +1,7 @@
 import db from "@hakwa/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-
+import { sendEmail } from "@hakwa/email";
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET!,
   baseUrl: process.env.BETTER_AUTH_URL!,
@@ -16,5 +16,14 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
+  },
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendEmail({
+        to: user.email,
+        subject: "Verify your email",
+        html: `<p>Please verify your email by clicking the following link: <a href="${url}">Click here</a></p>`,
+      });
+    },
   },
 });
