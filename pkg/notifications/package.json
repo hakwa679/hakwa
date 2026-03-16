@@ -1,0 +1,19 @@
+{
+    "name": "@hakwa/notifications",
+    "version": "0.0.1",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "types": "./src/index.ts",
+    "dependencies": {
+        "@hakwa/db": "*",
+        "@hakwa/redis": "*",
+        "@hakwa/email": "*",
+        "expo-server-sdk": "^3.14.0",
+        "zod": "^3.24.2"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0"
+    }
+}

@@ -228,7 +228,7 @@ see trip-level net earnings.
 
 ### Assumptions
 
-- Drivers are employees or agents of a merchant (operator). A driver logs in
+- Drivers are employees or agents of a merchant (fleet owner). A driver logs in
   with their own driver account, not the merchant account.
 - Vehicle selection at trip start: in Phase 1 a driver has exactly one active
   vehicle assigned. Multi-vehicle selection is deferred.

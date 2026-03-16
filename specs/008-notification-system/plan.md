@@ -44,11 +44,12 @@ concurrent dispatch; single consumer worker for Phase 1
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-- [ ] **I. Package-First** — New shared logic placed in `pkg/<name>` workspace
-      package, not inlined in `api/` or `apps/`.
-- [ ] **II. Type Safety** — No `any` without justification; DB types derived
+- [x] **I. Package-First** — `@hakwa/notifications` package scaffolded in T000
+      before any shared logic is written; consumed via workspace import only.
+- [x] **II. Type Safety** — No `any` without justification; DB types derived
       from Drizzle `$inferSelect`/`$inferInsert`; external inputs validated at
-      boundary.
+      boundary (T037 adds Zod schemas in Phase 2 before any route handler goes
+      live).
 - [x] **III. Security** — Push token registration requires session auth;
       `POST /devices` validates token format; device row ownership enforced;
       WebSocket notification channel scoped to `user:{userId}`.

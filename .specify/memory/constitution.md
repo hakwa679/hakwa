@@ -22,18 +22,18 @@ Deferred TODOs: none
 
 Hakwa is a transport booking platform built for Fiji. The platform connects
 passengers with transport operators and merchants across multiple transport
-modes. Hakwa acts as the marketplace and payment layer; merchants (operators who
-own fleets or seats) register on the platform and list their services.
+modes. Hakwa acts as the marketplace and payment layer; merchants (fleet and
+seat owners) register on the platform and list their services.
 
 The platform explicitly supports two merchant licensing tiers:
 
-- **Licensed merchants** — operators holding a valid LTA (Land Transport
-  Authority) registered business. They provide a TIN and business registration
-  number during onboarding.
-- **Unlicensed merchants** — informal or individual operators (e.g., private
-  taxi drivers without a formal business entity) who operate under a lighter
-  onboarding flow. Regulatory obligations for this tier are determined by
-  Fiji-specific compliance rules and MUST be codified in the data model as a
+- **Licensed merchants** — businesses or individuals holding a valid LTA (Land
+  Transport Authority) registration. They provide a TIN and business
+  registration number during onboarding.
+- **Unlicensed merchants** — informal or individual transport providers (e.g.,
+  private taxi drivers without a formal business entity) who operate under a
+  lighter onboarding flow. Regulatory obligations for this tier are determined
+  by Fiji-specific compliance rules and MUST be codified in the data model as a
   merchant `licenseType` or equivalent field, not hardcoded in logic.
 
 **Current scope (Phase 1)**: Taxi booking — both licensed and unlicensed
@@ -65,13 +65,13 @@ tiers explicitly. Defaulting silently to one tier is not permitted.
 
 ### Frontend Applications
 
-| App / Portal          | Type              | Primary Users         | Phase       |
-| --------------------- | ----------------- | --------------------- | ----------- |
-| Rider App             | React Native Expo | Passengers            | 1 (current) |
-| Driver App            | React Native Expo | Drivers/Operators     | 1 (current) |
-| Merchant App          | React Native Expo | Merchant owners       | 1 (current) |
-| Web — Rider Portal    | React + Vite      | Passengers (web)      | 1 (current) |
-| Web — Merchant Portal | React + Vite      | Merchant owners (web) | 1 (current) |
+| App / Portal          | Type              | Primary Users                                       | Phase       |
+| --------------------- | ----------------- | --------------------------------------------------- | ----------- |
+| Rider App             | React Native Expo | Passengers                                          | 1 (current) |
+| Driver App            | React Native Expo | Operators (drivers, captains, bikers, pilots, etc.) | 1 (current) |
+| Merchant App          | React Native Expo | Merchant owners                                     | 1 (current) |
+| Web — Rider Portal    | React + Vite      | Passengers (web)                                    | 1 (current) |
+| Web — Merchant Portal | React + Vite      | Merchant owners (web)                               | 1 (current) |
 
 All five frontends are first-class citizens of the monorepo and MUST follow the
 same conventions. No frontend app may be treated as a prototype or exempted from
@@ -183,9 +183,10 @@ drift and makes auditing straightforward.
 
 Hakwa embeds a gamification layer to drive **user acquisition** (referrals),
 **retention** (streaks, levels), and **marketing distribution** (shareability of
-achievements). The system applies to **passengers** and **operators** separately
-— the two populations earn points through different actions and progress through
-their own level tracks.
+achievements). The system applies to **passengers** and **operators** (vehicle
+operators: drivers, captains, bikers, pilots, etc.) separately — the two
+populations earn points through different actions and progress through their own
+level tracks.
 
 #### Points
 
@@ -783,7 +784,7 @@ skipped, except for `system_alert` notifications which are non-opt-outable.
 #### Engagement-driven triggers
 
 The notification system MUST emit the following engagement triggers
-automatically (no manual operator action required):
+automatically (no manual action required):
 
 - **Gamification**: badge earned, level-up, streak milestone, referral
   conversion.

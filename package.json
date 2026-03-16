@@ -6,7 +6,8 @@
     "workspaces": [
         "pkg/*",
         "api",
-        "apps/*"
+        "apps/*",
+        "apps/**"
     ],
     "scripts": {
         "db-push": "npm run push -w @hakwa/db",

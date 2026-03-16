@@ -8,8 +8,8 @@
 
 ## Summary
 
-Step-by-step onboarding wizard for licensed and unlicensed merchant operators.
-The `merchant` table gains `userId`, `licenseType`, `status`, `nationalId`, and
+Step-by-step onboarding wizard for licensed and unlicensed merchants. The
+`merchant` table gains `userId`, `licenseType`, `status`, `nationalId`, and
 `phone` columns. A new `vehicle` table captures physical vehicle records. The
 existing `bankAccount` table (wallet schema) is reused for payout destinations.
 Submission transitions status to `under_review` and dispatches a notification to

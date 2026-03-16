@@ -3,9 +3,9 @@
 **Feature Branch**: `007-gamification-system`  
 **Created**: 2026-03-16  
 **Status**: Draft  
-**Input**: Gamification system for passengers and operators: points ledger,
-level progression, badges, referral codes, daily streak tracking, and
-leaderboard
+**Input**: Gamification system for passengers and operators (vehicle operators:
+drivers, captains, bikers, pilots, etc.): points ledger, level progression,
+badges, referral codes, daily streak tracking, and leaderboard
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -267,8 +267,9 @@ points, served from a fast read path, independently of the points-earning flows.
 
 ### Assumptions
 
-- Gamification applies to passengers and operators (drivers/merchants) as
-  separate populations with their own level tracks and point-earning actions.
+- Gamification applies to passengers and operators (vehicle operators: drivers,
+  captains, bikers, pilots, etc.) as separate populations with their own level
+  tracks and point-earning actions.
 - Social sharing of badges and achievements (deep-link share cards) is deferred
   to a future phase.
 - A "review submitted" points source is defined in the enum but the review

@@ -91,8 +91,8 @@ user ──────────────────── userProfile (1
 
 ## Role Enum Values
 
-| Value       | Description                                               |
-| ----------- | --------------------------------------------------------- |
-| `passenger` | Default role. Access to Rider App and Rider Web Portal.   |
-| `driver`    | Operator role. Access to Driver App.                      |
-| `merchant`  | Merchant/fleet owner role. Access to Merchant App/Portal. |
+| Value       | Description                                                                        |
+| ----------- | ---------------------------------------------------------------------------------- |
+| `passenger` | Default role. Access to Rider App and Rider Web Portal.                            |
+| `driver`    | Vehicle operator role (driver, captain, biker, pilot, etc.). Access to Driver App. |
+| `merchant`  | Merchant/fleet owner role. Access to Merchant App/Portal.                          |

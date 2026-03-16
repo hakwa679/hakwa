@@ -8,14 +8,15 @@
 
 ## Summary
 
-Gamification system for passengers and operators: trip completion awards points
-(10/trip), referral rewards (50 for signup + 100 for first trip, capped at 20
-referrals), level progression (derived from lookup table, no stored field),
-badge awards (idempotent via `UNIQUE (userId, badgeId)`), daily streak tracking
-(Fiji local date, milestones at 7 and 30 days), and a Redis Sorted Set
-leaderboard (weekly). All side effects run **after** the primary transaction
-commits via a Redis Stream `gamification:events` consumed by a `@hakwa/workers`
-task, ensuring gamification failures never roll back business logic.
+Gamification system for passengers and operators (vehicle operators: drivers,
+captains, bikers, pilots, etc.): trip completion awards points (10/trip),
+referral rewards (50 for signup + 100 for first trip, capped at 20 referrals),
+level progression (derived from lookup table, no stored field), badge awards
+(idempotent via `UNIQUE (userId, badgeId)`), daily streak tracking (Fiji local
+date, milestones at 7 and 30 days), and a Redis Sorted Set leaderboard (weekly).
+All side effects run **after** the primary transaction commits via a Redis
+Stream `gamification:events` consumed by a `@hakwa/workers` task, ensuring
+gamification failures never roll back business logic.
 
 ---
 

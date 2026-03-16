@@ -3,7 +3,7 @@
 **Feature Branch**: `002-merchant-onboarding`  
 **Created**: 2026-03-16  
 **Status**: Draft  
-**Input**: Merchant onboarding flow for both licensed and unlicensed operators,
+**Input**: Merchant onboarding flow for both licensed and unlicensed merchants,
 including business verification, fleet registration, bank account setup for
 payouts, and profile completion
 
@@ -55,7 +55,7 @@ identity information (full name, national ID number, phone number) and their
 vehicle are required. No TIN or LTA registration number is collected. On
 completion they reach the dashboard in "under review" state.
 
-**Why this priority**: Unlicensed operators represent the broader informal
+**Why this priority**: Unlicensed merchants represent the broader informal
 market in Fiji. Omitting this flow immediately after the licensed flow ensures
 both tiers are serviceable at launch.
 
@@ -66,7 +66,7 @@ complete the lighter onboarding (no business documents) and reach the dashboard.
 
 1. **Given** a verified merchant account with `licenseType = unlicensed`,
    **When** they open the app post-verification, **Then** the onboarding wizard
-   launches with only the steps relevant to unlicensed operators (no TIN or LTA
+   launches with only the steps relevant to unlicensed merchants (no TIN or LTA
    registration fields are shown).
 2. **Given** the identity step, **When** the merchant submits their full name
    and national ID number, **Then** the data is saved and they advance to
@@ -214,7 +214,7 @@ it listed in their fleet.
   wizard in under 6 minutes.
 - **SC-003**: 100% of merchant submissions correctly differentiate between
   licensed and unlicensed fields — no licensed merchant is shown fields intended
-  only for unlicensed operators, and vice versa.
+  only for unlicensed merchants, and vice versa.
 - **SC-004**: Mid-flow abandonment recovery rate: merchants who return after
   abandoning mid-wizard resume from the correct last-completed step in ≥ 99% of
   cases.

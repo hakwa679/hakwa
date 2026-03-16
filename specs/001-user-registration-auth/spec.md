@@ -99,10 +99,11 @@ email, set a new password, and reach the authenticated home screen.
 
 ### User Story 4 - Driver & Merchant Account Creation (Priority: P2)
 
-An operator (driver or merchant) registers through the Driver App or Merchant
-App. The registration flow captures role-specific information (vehicle details
-for drivers; business/identity details for merchants) in addition to base
-account credentials, while keeping initial sign-up minimal and deferring
+An operator (driver, captain, biker, pilot, or other vehicle operator) registers
+through the Driver App. A merchant (fleet or seat owner) registers through the
+Merchant App. The registration flow captures role-specific information (vehicle
+details for operators; business/identity details for merchants) in addition to
+base account credentials, while keeping initial sign-up minimal and deferring
 non-critical profile data.
 
 **Why this priority**: Drivers and merchants are the supply side of the
