@@ -11,7 +11,7 @@
     "scripts": {
         "db-push": "npm run push -w @hakwa/db",
         "api-dev": "npm run dev -w @hakwa/api",
-        "git-push": "git add . && git commit && git push"
+        "git-push": "git add . && git commit -m \"Latest_Changes\" && git push"
     },
     "devDependencies": {
         "typescript": "^5.9.3"
