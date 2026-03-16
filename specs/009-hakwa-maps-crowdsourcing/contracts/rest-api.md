@@ -11,23 +11,31 @@ and frontend apps.
 
 **Error codes** (all defined in `@hakwa/errors`):
 
-| Code                        | HTTP | Description                                              |
-| --------------------------- | ---- | -------------------------------------------------------- |
-| `MAP_OUT_OF_BOUNDS`         | 422  | Coordinates fall outside the Fiji bounding box           |
-| `MAP_GPS_ACCURACY_TOO_LOW`  | 422  | Submitted GPS accuracy exceeded 50 m                     |
-| `MAP_DAILY_LIMIT_REACHED`   | 429  | User hit the 20 contributions/day cap                    |
-| `MAP_ALREADY_VOTED`         | 409  | User already cast a vote on this feature                 |
-| `MAP_CANNOT_VERIFY_OWN`     | 403  | Contributor attempted to verify their own submission     |
-| `MAP_VOTING_CLOSED`         | 409  | Feature is no longer in pending state                    |
-| `MAP_PHOTO_TOO_LARGE`       | 413  | Photo upload exceeds 5 MB limit                          |
-| `MAP_FEATURE_NOT_FOUND`     | 404  | `mapFeature` with given ID does not exist                |
+| Code                          | HTTP | Description                                                                  |
+| ----------------------------- | ---- | ---------------------------------------------------------------------------- |
+| `MAP_OUT_OF_BOUNDS`           | 422  | Coordinates fall outside the Fiji bounding box                               |
+| `MAP_GPS_ACCURACY_TOO_LOW`    | 422  | Submitted GPS accuracy exceeded 50 m                                         |
+| `MAP_DAILY_LIMIT_REACHED`     | 429  | User hit the 20 contributions/day cap                                        |
+| `MAP_ALREADY_VOTED`           | 409  | User already cast a vote on this feature                                     |
+| `MAP_CANNOT_VERIFY_OWN`       | 403  | Contributor attempted to verify their own submission                         |
+| `MAP_VOTING_CLOSED`           | 409  | Feature is no longer in a state that accepts votes or reports                |
+| `MAP_PHOTO_TOO_LARGE`         | 413  | Photo upload exceeds 5 MB limit                                              |
+| `MAP_FEATURE_NOT_FOUND`       | 404  | `mapFeature` with given ID does not exist                                    |
+| `MAP_CONTENT_VIOLATION`       | 422  | Submission rejected by automated content screener (`auto_reject` outcome)    |
+| `MAP_USER_MAP_BANNED`         | 403  | User is currently map-banned and may not contribute or verify                |
+| `MAP_ALREADY_REPORTED`        | 409  | User has already submitted a report on this feature                          |
+| `MAP_CANNOT_REPORT_OWN`       | 403  | Contributor attempted to report their own submission                         |
 
 ---
 
 ## `POST /map/features` — Submit a Map Contribution
 
-Creates a new `mapFeature` in `pending` state and awards
-`MAP_POINTS_CONTRIBUTION` (25 pts) to the submitter.
+Creates a new `mapFeature` and awards `MAP_POINTS_CONTRIBUTION` (25 pts) to the
+submitter **if** the content screener returns `pass`. If the screener returns
+`flag`, the feature is created with `status = "pending_review"` and points are
+withheld until an admin clears it (FR-028, FR-029). If the screener returns
+`auto_reject`, the request is rejected with `422 MAP_CONTENT_VIOLATION` and no
+row is created.
 
 **Auth**: Required.  
 **Rate limit**: 20 requests per user per UTC day.
@@ -69,6 +77,7 @@ Creates a new `mapFeature` in `pending` state and awards
   "status": "pending",
   "pointsAwarded": 25,
   "totalPoints": 340,
+  "underReview": false,
   "proximityWarning": {
     "exists": true,
     "nearbyFeatureId": "uuid",
@@ -77,10 +86,15 @@ Creates a new `mapFeature` in `pending` state and awards
 }
 ```
 
-> `proximityWarning` is `null` when no same-type feature exists within 10 m.
-> The warning is informational — the submission is still accepted.
+> `status` is `"pending"` when the content screener passes, or `"pending_review"`
+> when the screener flags the submission (points withheld, admin review required).
+> `underReview` is `true` only when `status = "pending_review"`. In this case
+> `pointsAwarded` is `0` — points will be awarded if an admin later approves the
+> submission. `proximityWarning` is `null` when no same-type feature exists within
+> 10 m. The warning is informational — the submission is still accepted.
 
-**Error Responses**: `401`, `422 MAP_OUT_OF_BOUNDS`, `422 MAP_GPS_ACCURACY_TOO_LOW`,
+**Error Responses**: `401`, `403 MAP_USER_MAP_BANNED`, `422 MAP_OUT_OF_BOUNDS`,
+`422 MAP_GPS_ACCURACY_TOO_LOW`, `422 MAP_CONTENT_VIOLATION`,
 `429 MAP_DAILY_LIMIT_REACHED`.
 
 ---
@@ -201,14 +215,21 @@ transition is executed atomically in the same transaction.
 ```json
 {
   "vote": "confirm",
-  "note": null
+  "note": null,
+  "disputeCategory": null
 }
 ```
 
-| Field  | Type   | Required | Validation                 |
-| ------ | ------ | -------- | -------------------------- |
-| `vote` | string | Yes      | `"confirm"` \| `"dispute"` |
-| `note` | string | No       | Max 500 chars              |
+| Field             | Type   | Required | Validation                                                                                 |
+| ----------------- | ------ | -------- | ------------------------------------------------------------------------------------------ |
+| `vote`            | string | Yes      | `"confirm"` \| `"dispute"`                                                                 |
+| `note`            | string | No       | Max 500 chars                                                                              |
+| `disputeCategory` | string | No       | `"harmful_content"` \| `"dangerous_info"` \| `"spam"` \| `"duplicate"`; `null` if omitted |
+
+> `disputeCategory` is accepted from any user but only triggers the instant
+> `under_review` escalation when the caller holds the `trusted` or `senior`
+> trust tier and the category is `"harmful_content"` or `"dangerous_info"`
+> (FR-036).
 
 **Response `200 OK`**:
 
@@ -221,18 +242,21 @@ transition is executed atomically in the same transaction.
   "disputeCount": 0,
   "pointsAwarded": 5,
   "totalPoints": 345,
-  "activated": false
+  "activated": false,
+  "escalated": false
 }
 ```
 
 > `activated` is `true` when this vote tipped the feature to `active`. In that
 > case, the contributor receives a separate `map_contribution_accepted` ledger
 > entry and push notification — the verifier's response does not change.
+> `escalated` is `true` when a trusted/senior contributor's dispute category
+> caused an immediate `under_review` transition.
 > `newStatus` reflects the feature status after this vote (`pending`, `active`,
-> or `rejected`).
+> `rejected`, or `under_review`).
 
-**Error Responses**: `401`, `403 MAP_CANNOT_VERIFY_OWN`, `404 MAP_FEATURE_NOT_FOUND`,
-`409 MAP_ALREADY_VOTED`, `409 MAP_VOTING_CLOSED`.
+**Error Responses**: `401`, `403 MAP_USER_MAP_BANNED`, `403 MAP_CANNOT_VERIFY_OWN`,
+`404 MAP_FEATURE_NOT_FOUND`, `409 MAP_ALREADY_VOTED`, `409 MAP_VOTING_CLOSED`.
 
 ---
 
@@ -338,11 +362,18 @@ month map points (from Redis), and any active weekly missions with their progres
   "mapStreak": 4,
   "rideImpactCount": 47,
   "currentMonthMapPoints": 85,
+  "trustTier": "trusted",
+  "isMapBanned": false,
   "badges": [
     { "key": "map_first_contribution", "name": "First Mapper", "awardedAt": "2026-03-10T08:00:00Z" }
   ]
 }
 ```
+
+> `trustTier` is `"standard"` (default), `"trusted"` (≥ 5 accepted, no ban),
+> or `"senior"` (≥ 20 accepted, no ban). It is computed dynamically — never
+> cached. `isMapBanned` is `true` only while an active ban is in force; expired
+> bans are auto-lifted on the same request that reads them (FR-038).
 
 **Error Responses**: `401`.
 
@@ -523,3 +554,196 @@ for passengers.
 
 **Error Responses**: `400` (invalid geometry), `401`, `403` (wrong role or
 opt-in missing), `409` (trace for this `tripId` already submitted).
+
+---
+
+## `POST /map/features/:id/report` — Report a Map Feature
+
+Submits a community report on a `pending` or `active` feature. Each user may
+report the same feature only once. When the distinct reporter count reaches
+`MAP_REPORT_AUTO_REVIEW_THRESHOLD` (3), the feature automatically transitions
+to `under_review` and is removed from all map layers (FR-030, FR-031).
+
+**Auth**: Required.  
+**Rate limit**: 50 reports per user per UTC day (prevents spam reporting).
+
+**Path parameter**: `id` — `mapFeature` UUID.
+
+**Request body**:
+
+```json
+{
+  "reason": "incorrect_info",
+  "note": "This market closed down in 2025"
+}
+```
+
+| Field    | Type   | Required | Validation                                                                        |
+| -------- | ------ | -------- | --------------------------------------------------------------------------------- |
+| `reason` | string | Yes      | `"harmful_content"` \| `"incorrect_info"` \| `"no_longer_exists"` \| `"duplicate"` |
+| `note`   | string | No       | Max 500 chars                                                                     |
+
+**Response `201 Created`**:
+
+```json
+{
+  "reportId": "uuid",
+  "featureId": "uuid",
+  "status": "open",
+  "underReviewNow": false
+}
+```
+
+> `underReviewNow: true` indicates that this report triggered the threshold and
+> the feature has just transitioned to `under_review`. The caller's UI should
+> display _"Thanks — this feature is now under review."_
+
+**Error Responses**: `401`, `403 MAP_CANNOT_REPORT_OWN`, `404 MAP_FEATURE_NOT_FOUND`,
+`409 MAP_ALREADY_REPORTED`, `409 MAP_VOTING_CLOSED` (feature not in `pending`
+or `active` state).
+
+---
+
+## `GET /admin/map/moderation/queue` — Admin Moderation Queue
+
+Returns features currently in `pending_review` or `under_review` state,
+paginated and sorted oldest-first. Only accessible to users with the `admin` or
+`map_moderator` role (NFR-008).
+
+**Auth**: Required. Role `admin` or `map_moderator`.  
+**Base URL**: `/api/v1/admin/map`
+
+**Query parameters**:
+
+| Param    | Type    | Required | Description                                                                  |
+| -------- | ------- | -------- | ---------------------------------------------------------------------------- |
+| `status` | string  | No       | `"pending_review"` \| `"under_review"` \| omit for both                      |
+| `cursor` | string  | No       | Keyset pagination cursor                                                     |
+| `limit`  | integer | No       | Default 20, max 50                                                           |
+
+**Response `200 OK`**:
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "type": "poi",
+      "name": "Fake Market XYZ",
+      "category": "market",
+      "status": "pending_review",
+      "gpsVelocityFlag": false,
+      "contentFlagReason": "keyword_match",
+      "contributorDisplayName": "Amelia T.",
+      "contributorId": "uuid",
+      "confirmCount": 0,
+      "disputeCount": 0,
+      "reportCount": 0,
+      "createdAt": "2026-03-15T08:22:00Z"
+    }
+  ],
+  "nextCursor": "string | null",
+  "totalCount": 7
+}
+```
+
+> `contentFlagReason` is present only for `pending_review` items:
+> `"keyword_match"` or `"velocity_flag"`. For `under_review` items it is `null`.
+> `reportCount` is the number of distinct user reports submitted so far.
+
+**Error Responses**: `401`, `403 Forbidden` (insufficient role).
+
+---
+
+## `POST /admin/map/features/:id/moderate` — Apply Moderation Action
+
+Applies a moderation action to a feature in `pending_review` or `under_review`
+state, logs it to `mapModerationLog`, and triggers downstream effects (points
+award, notifications, bans) as specified in FR-029, FR-033, FR-034, FR-038.
+
+**Auth**: Required. Role `admin` or `map_moderator`.  
+**Base URL**: `/api/v1/admin/map`
+
+**Path parameter**: `id` — `mapFeature` UUID.
+
+**Request body**:
+
+```json
+{
+  "action": "approve",
+  "reason": null
+}
+```
+
+| Field    | Type   | Required | Validation                                                                           |
+| -------- | ------ | -------- | ------------------------------------------------------------------------------------ |
+| `action` | string | Yes      | `"approve"` \| `"reject"` \| `"warn_contributor"` \| `"ban_contributor"`             |
+| `reason` | string | No       | Max 1 000 chars — required when `action` is `"reject"`, `"warn_contributor"`, or `"ban_contributor"` |
+| `banExpiresAt` | string (ISO-8601) | No | Optional expiry for `ban_contributor`; null = permanent ban         |
+
+**Action effects**:
+
+| Action              | Feature transition              | Points effect                              | Notification to contributor                         |
+| ------------------- | ------------------------------- | ------------------------------------------ | --------------------------------------------------- |
+| `approve`           | `pending_review` → `pending`; `under_review` → `active` | Award withheld points (if `pending_review`) | _"Feature restored — thanks!"_ (if `under_review`) |
+| `reject`            | → `rejected`                    | None (no reversal)                         | _"Feature removed after review."_                  |
+| `warn_contributor`  | No change                       | None                                       | _"Please review our Community Guidelines."_          |
+| `ban_contributor`   | No change to feature            | None                                       | _"Your map access has been suspended."_             |
+
+**Response `200 OK`**:
+
+```json
+{
+  "featureId": "uuid",
+  "action": "approve",
+  "newFeatureStatus": "pending",
+  "logId": "uuid"
+}
+```
+
+> `newFeatureStatus` reflects the status immediately after this action.
+
+**Error Responses**: `401`, `403 Forbidden` (insufficient role),
+`404 MAP_FEATURE_NOT_FOUND`, `422` (feature not in a moderatable state).
+
+---
+
+## `GET /admin/map/abuse/flags` — Abuse Detection Flags
+
+Returns flagged users from the nightly abuse-detection job, filtered by type
+and review status. Used by moderators to investigate voting rings and velocity
+clusters.
+
+**Auth**: Required. Role `admin` or `map_moderator`.  
+**Base URL**: `/api/v1/admin/map`
+
+**Query parameters**:
+
+| Param        | Type    | Required | Description                                                            |
+| ------------ | ------- | -------- | ---------------------------------------------------------------------- |
+| `flagType`   | string  | No       | `"voting_ring"` \| `"gps_velocity_cluster"` \| omit for all            |
+| `reviewed`   | boolean | No       | `false` (default) = unreviewed only; `true` = reviewed; omit = all    |
+| `cursor`     | string  | No       | Keyset pagination cursor                                               |
+| `limit`      | integer | No       | Default 20, max 50                                                     |
+
+**Response `200 OK`**:
+
+```json
+{
+  "data": [
+    {
+      "flagId": "uuid",
+      "userId": "uuid",
+      "displayName": "Josefa K.",
+      "flagType": "voting_ring",
+      "occurrenceCount": 3,
+      "lastDetectedAt": "2026-03-16T00:05:00Z",
+      "reviewedAt": null
+    }
+  ],
+  "nextCursor": "string | null",
+  "totalCount": 5
+}
+```
+
+**Error Responses**: `401`, `403 Forbidden` (insufficient role).

@@ -100,6 +100,45 @@
 - [ ] **FR-027** — Streak increments on any map action (contribution or verification) per UTC day
 - [ ] **FR-027** — 7-day streak awards `MAP_POINTS_MAP_STREAK_7` (35 pts) via `streak_bonus` ledger entry
 
+### Safety, Moderation & Trust
+
+- [ ] **FR-028** — Content screener runs synchronously before any DB write on `POST /map/features`
+- [ ] **FR-028** — Screener outcome `pass` → `status = "pending"`, points awarded normally
+- [ ] **FR-028** — Screener outcome `flag` → `status = "pending_review"`, no `pointsLedger` entry, moderator alert enqueued
+- [ ] **FR-028** — Screener outcome `auto_reject` → `422 MAP_CONTENT_VIOLATION`, no rows created
+- [ ] **FR-028** — Blocklist loaded from `@hakwa/core/map-blocklist.json` at server startup; no per-request DB reads
+- [ ] **FR-029** — Points for `pending_review` feature withheld until admin approves
+- [ ] **FR-029** — Admin `approve` on `pending_review` atomically creates `pointsLedger` + transitions status
+- [ ] **FR-030** — `POST /map/features/:id/report` accepts `reason` + optional `note`; unique on `(featureId, reporterId)`
+- [ ] **FR-030** — Reporting own feature returns `403 MAP_CANNOT_REPORT_OWN`
+- [ ] **FR-030** — Reporting feature not in `pending`/`active` returns `409 MAP_VOTING_CLOSED`
+- [ ] **FR-031** — Third unique report triggers atomic `under_review` transition (row-level lock on `mapFeature`)
+- [ ] **FR-031** — `under_review` feature removed from all map layers (pending and active)
+- [ ] **FR-031** — Contributor push notification sent: "A feature you submitted is under review"
+- [ ] **FR-032** — `GET /admin/map/moderation/queue` returns `pending_review` + `under_review` features, paginated
+- [ ] **FR-032** — `POST /admin/map/features/:id/moderate` accepts actions: `approve`, `reject`, `warn_contributor`, `ban_contributor`
+- [ ] **FR-032** — Admin endpoints protected by role middleware (`admin` or `map_moderator`); `403` for all others
+- [ ] **FR-033** — Every moderation action creates an append-only `mapModerationLog` row
+- [ ] **FR-033** — `mapModerationLog` rows are insert-only; never updated or deleted
+- [ ] **FR-034** — `approve` on `under_review` sends contributor notification: "Feature restored"
+- [ ] **FR-034** — `reject` sends contributor notification: "Feature removed after review"
+- [ ] **FR-034** — No `pointsLedger` reversal on rejection of previously-awarded contributions
+- [ ] **FR-035** — Trust tier computed dynamically: `standard` (default) / `trusted` (≥5 accepted) / `senior` (≥20 accepted)
+- [ ] **FR-035** — Active ban (`isMapBanned = true`) always returns tier `standard` regardless of contribution count
+- [ ] **FR-035** — `trustTier` field included in `GET /map/stats/me` response
+- [ ] **FR-036** — `disputeCategory` field accepted in `POST /map/features/:id/verify` body
+- [ ] **FR-036** — Trusted/Senior contributor dispute with `harmful_content` or `dangerous_info` triggers immediate `under_review`
+- [ ] **FR-036** — Escalated dispute does not alter verification points awarded to the voter
+- [ ] **FR-037** — GPS velocity heuristic runs on every `POST /map/features` request
+- [ ] **FR-037** — Velocity > `MAP_GPS_MAX_VELOCITY_KM_H` (250 km/h) → `status = "pending_review"`, `gpsVelocityFlag = true`
+- [ ] **FR-037** — Velocity check shares the pre-insert SELECT with the daily-rate-limit check (no extra round-trip)
+- [ ] **FR-038** — Every `POST /map/features` and `POST /map/features/:id/verify` checks `isMapBanned` first
+- [ ] **FR-038** — `isMapBanned = true` returns `403 MAP_USER_MAP_BANNED` immediately
+- [ ] **FR-038** — Expired `banExpiresAt` auto-lifts the ban inline before the request proceeds
+- [ ] **FR-039** — Nightly `map-abuse-check` job identifies voting-ring candidate pairs (> 80% mutual confirm rate)
+- [ ] **FR-039** — Flagged pairs upserted into `mapAbuseFlag` with `flagType = "voting_ring"`
+- [ ] **FR-039** — Job is read-only with respect to votes and bans; no automatic bans
+
 ---
 
 ## Non-Functional Requirements
@@ -110,20 +149,30 @@
 - [ ] **NFR-004** — Rate limiting: 20 contributions/day and 200 verifications/day per user
 - [ ] **NFR-005** — Photo uploads handled via presigned URL pre-upload; contribution endpoint receives URL only
 - [ ] **NFR-006** — Badge evaluation and leaderboard updates execute asynchronously after primary transaction
+- [ ] **NFR-007** — Content screener adds ≤ 50 ms to P99 latency; blocklist in-memory at server startup
+- [ ] **NFR-008** — Admin endpoints (`/api/v1/admin/map/...`) on a separate router with role middleware, independent of user-session auth
 
 ---
 
 ## Data Model Checklist
 
 - [ ] `mapFeature` table created in `pkg/db/schema/map.ts` with all required columns
+- [ ] `mapFeature.status` enum includes `pending_review` and `under_review` (FR-028, FR-031)
+- [ ] `mapFeature.gps_velocity_flag` boolean column added (FR-037)
 - [ ] `mapVerification` table created with unique constraint on `(featureId, userId)`
-- [ ] `mapContributorStats` table created with per-user counters (including `mapStreak`, `mapStreakCheckpoint`)
+- [ ] `mapVerification.dispute_category` nullable column added (FR-036)
+- [ ] `mapContributorStats` table created with per-user counters (including `mapStreak`, `mapStreakCheckpoint`, `rideImpactCount`)
 - [ ] `mapZone` table created with `slug`, `displayName`, `geometry_json`, `targetFeatureCount`, `currentFeatureCount`
 - [ ] `mapMission` table created with `weekStart`, `deadline`, `actionType`, `targetCount`, optional `zoneId`
 - [ ] `mapMissionProgress` table created with UNIQUE on `(missionId, userId)`
 - [ ] `mapRoadTrace` table created; `trace_geo_json` column marked restricted in query builders
+- [ ] `mapFeatureReport` table created with UNIQUE on `(featureId, reporterId)` (FR-030)
+- [ ] `mapContributorTrust` table created with UNIQUE on `userId`; `banExpiresAt` nullable (FR-038)
+- [ ] `mapModerationLog` table created; `featureId` nullable FK with SET NULL on delete (FR-033)
+- [ ] `mapAbuseFlag` table created with UNIQUE on `(userId, flagType)` (FR-039)
 - [ ] `PointsSourceAction` union type extended with all 7 new values (`map_contribution`, `map_verification`, `map_contribution_accepted`, `map_photo_bonus`, `map_road_trace`, `map_mission_completed`, `map_pioneer_bonus`)
-- [ ] All map constants defined as named exports in `@hakwa/core` (15 constants, no magic numbers)
+- [ ] All map constants defined as named exports in `@hakwa/core` (20 constants — 15 original + 5 safety constants)
+- [ ] Safety constants defined: `MAP_REPORT_AUTO_REVIEW_THRESHOLD`, `MAP_TRUST_MIN_ACCEPTED_TRUSTED`, `MAP_TRUST_MIN_ACCEPTED_SENIOR`, `MAP_GPS_MAX_VELOCITY_KM_H`, `MAP_VOTING_RING_MUTUAL_THRESHOLD`
 - [ ] Spatial / B-tree index on `mapFeature.status` and `mapFeature.geometryJson`
 - [ ] All new schema files exported through `@hakwa/db` index
 
@@ -151,16 +200,21 @@
 - [ ] `POST /map/features` — submit contribution
 - [ ] `GET /map/features/pending` — list pending features (bbox, type, age filters)
 - [ ] `GET /map/features/active` — GeoJSON FeatureCollection of active features
-- [ ] `POST /map/features/:id/verify` — cast confirm/dispute vote
+- [ ] `POST /map/features/:id/verify` — cast confirm/dispute vote (includes `disputeCategory`)
+- [ ] `POST /map/features/:id/report` — report a `pending` or `active` feature (FR-030)
 - [ ] `GET /map/leaderboard` — monthly map leaderboard (top 50 + caller rank)
-- [ ] `GET /map/stats/me` — caller stats including `mapStreak` and `rideImpactCount`
+- [ ] `GET /map/stats/me` — caller stats including `mapStreak`, `rideImpactCount`, `trustTier`, `isMapBanned`
 - [ ] `GET /map/missions` — current week missions with caller progress
 - [ ] `GET /map/zones` — all zones with completion % and optional top contributors
 - [ ] `GET /map/zones/:slug` — single zone detail with pioneer and top 3
 - [ ] `POST /map/trace` — submit passive road trace (drivers only)
-- [ ] All endpoints authenticated via `getSessionFromRequest`
+- [ ] `GET /admin/map/moderation/queue` — features in `pending_review`/`under_review`; role-protected (FR-032)
+- [ ] `POST /admin/map/features/:id/moderate` — approve/reject/warn/ban; logs to `mapModerationLog` (FR-032, FR-033)
+- [ ] `GET /admin/map/abuse/flags` — nightly abuse flag results; role-protected (FR-039)
+- [ ] All public endpoints authenticated via `getSessionFromRequest`
+- [ ] All admin endpoints protected by a separate role-validation middleware (NFR-008)
 - [ ] All endpoints have application-layer rate limiting configured
-- [ ] `MAP_OUT_OF_BOUNDS`, `MAP_DAILY_LIMIT_REACHED`, `MAP_ALREADY_VOTED`, `MAP_VOTING_CLOSED`, `MAP_PHOTO_TOO_LARGE`, `MAP_TRACE_OPT_IN_REQUIRED` error codes defined in `@hakwa/errors`
+- [ ] All error codes defined in `@hakwa/errors`: `MAP_OUT_OF_BOUNDS`, `MAP_DAILY_LIMIT_REACHED`, `MAP_ALREADY_VOTED`, `MAP_VOTING_CLOSED`, `MAP_PHOTO_TOO_LARGE`, `MAP_TRACE_OPT_IN_REQUIRED`, `MAP_CONTENT_VIOLATION`, `MAP_USER_MAP_BANNED`, `MAP_ALREADY_REPORTED`, `MAP_CANNOT_REPORT_OWN`
 
 ---
 
@@ -194,6 +248,10 @@
 - [ ] Zone progress service in `api/src/services/mapZone.ts` wired to feature-activated event
 - [ ] Zone milestone threshold detection and notification dispatch (50% and 100%)
 - [ ] Pioneer bonus evaluated inside zone progress service (RETURNING = 1 check)
+- [ ] Nightly `map-abuse-check` job in `api/src/jobs/mapAbuseCheck.ts` — identifies voting-ring pairs (FR-039)
+- [ ] Abuse-check job upserts into `mapAbuseFlag` (`ON CONFLICT (userId, flagType) DO UPDATE`) — no new rows on repeat
+- [ ] Content screener function `mapSafety.ts` in `@hakwa/core` — loaded at server startup (NFR-007)
+- [ ] `map-blocklist.json` config file in `api/src/config/` — version-controlled, updated via PR
 
 ---
 

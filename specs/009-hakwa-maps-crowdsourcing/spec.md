@@ -443,6 +443,78 @@ passive tracing, and leaderboard systems.
 
 ---
 
+### User Story 11 — Safety, Moderation & Trust (Priority: P1)
+
+The platform operates a three-layer safety architecture that is invisible to
+honest users but catches harmful content automatically, empowers the community
+to flag live problems, and gives administrators the tools to act quickly. The
+single guiding principle is **zero friction for legitimate users, zero tolerance
+for harmful content**.
+
+**Why this priority**: A single harmful pin — an offensive name, a deliberately
+wrong road in a remote area, or a fake "safe shortcut" through private property
+— could cause real-world harm or erode trust in the entire product. Safety is a
+prerequisite for shipping a live map product, not an afterthought.
+
+**Independent Test**: A feature submission whose `name` matches a blocked
+keyword pattern is created with `status = "pending_review"` and no
+`pointsLedger` entry is written — independently of the verification, badge, and
+leaderboard systems.
+
+**Acceptance Scenarios**:
+
+1. **Given** a user submits a feature whose `name` matches a blocked keyword,
+   **When** the content screener evaluates the text synchronously, **Then** the
+   `mapFeature` is created with `status = "pending_review"`, a moderator alert
+   is enqueued, and no `pointsLedger` entry is created. The user sees no error —
+   their app shows a reassuring _"Feature submitted — we'll review it shortly
+   (usually within 24 hours)."_ confirmation.
+
+2. **Given** a `mapFeature` in `pending` state that 3 distinct users have
+   reported via `POST /map/features/:id/report`, **When** the third report is
+   submitted, **Then** the feature atomically transitions to `under_review`,
+   disappears from the pending layer for all users, and the original contributor
+   receives a push notification: _"A feature you submitted is currently under
+   community review."_
+
+3. **Given** a moderator opens `GET /admin/map/moderation/queue`, **When** they
+   approve a `pending_review` feature, **Then** in a single atomic transaction
+   the feature transitions to `pending`, the withheld contribution points are
+   awarded via a `pointsLedger` entry, and the action is logged to
+   `mapModerationLog`. The feature is now visible in the community verification
+   queue.
+
+4. **Given** a moderator approves an `under_review` feature, **When** the action
+   is applied, **Then** the feature transitions back to `active`, all map layers
+   are refreshed (Redis invalidation), the contributor receives _"Your map
+   feature has been reviewed and restored — thanks for contributing!"_, and the
+   action is logged.
+
+5. **Given** a moderator rejects any feature under review, **When** the action
+   is applied, **Then** the feature transitions to `rejected`, the contributor
+   receives _"A map feature you submitted was removed after review. Please see
+   our Community Guidelines."_, no `pointsLedger` reversal is performed, and the
+   action is logged.
+
+6. **Given** a moderator applies `ban_contributor` to a feature's original
+   contributor, **When** the ban is active, **Then** that user's subsequent map
+   contribution and verification requests return `403 MAP_USER_MAP_BANNED` and
+   no rows are created.
+
+7. **Given** a Trusted Contributor (≥ 5 accepted contributions, no active ban)
+   who casts a dispute with `disputeCategory = "harmful_content"`, **When** the
+   vote is submitted, **Then** the feature immediately transitions to
+   `under_review` regardless of its current `disputeCount`, a moderator alert is
+   enqueued, and the trusted contributor earns standard verification points.
+
+8. **Given** a submission whose coordinates are more than 250 km/h away from the
+   same user's previous submission within the past 60 minutes, **When** the
+   submission is received, **Then** the feature is created with
+   `status = "pending_review"` and `gpsVelocityFlag = true`, a moderator alert
+   is enqueued, and no points are awarded until an admin clears it.
+
+---
+
 ### Edge Cases
 
 - A user submitting duplicate coordinates (within 10 m) for a feature of the
@@ -478,6 +550,30 @@ passive tracing, and leaderboard systems.
   near-simultaneously): the first `UPDATE` to increment `currentFeatureCount`
   from 0 receives the pioneer bonus; the second sees `currentFeatureCount = 1`
   and receives no bonus.
+- A report against a `pending_review`, `under_review`, `rejected`, or `stale`
+  feature: `POST /map/features/:id/report` MUST return `409 MAP_VOTING_CLOSED` —
+  reporting is only open while a feature is `pending` or `active`.
+- A user attempting to report their own submission: the endpoint MUST return
+  `403 MAP_CANNOT_REPORT_OWN`; no `mapFeatureReport` row is created.
+- A moderator approving a `pending_review` feature: the withheld contribution
+  points MUST be awarded atomically in the same transaction as the status
+  transition. A crash between the two steps MUST NOT leave the feature approved
+  but the user unpaid.
+- A user whose `banExpiresAt` is in the past: the ban MUST be lifted
+  automatically (`isMapBanned = false`, `banExpiresAt = null`) inline during the
+  request — not on a nightly job — so an expired ban never silently blocks a
+  legitimate user.
+- A Trusted Contributor who subsequently falls below the
+  `MAP_TRUST_MIN_ACCEPTED_TRUSTED` threshold: trust tier is recomputed
+  dynamically on each request; prior trusted-dispute escalations are not
+  retroactively reversed.
+- A `pending_review` feature receiving a vote attempt from another user: the
+  verify endpoint MUST return `409 MAP_VOTING_CLOSED` because `pending_review`
+  features are not visible in the community verification queue.
+- The nightly abuse-detection job flagging the same user pair on consecutive
+  nights: `mapAbuseFlag.occurrenceCount` MUST be incremented via an upsert
+  (`ON CONFLICT (userId, flagType) DO UPDATE SET occurrenceCount = ...`) — not a
+  new row inserted — to prevent unbounded table growth.
 
 ---
 
@@ -485,9 +581,8 @@ passive tracing, and leaderboard systems.
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST allow any authenticated user (passenger or
-  operator) to submit a map feature of one of the allowed types (see entity list
-  below).
+- **FR-001**: The system MUST allow any authenticated user (passenger or driver)
+  to submit a map feature of one of the allowed types (see entity list below).
 - **FR-002**: The system MUST reject submissions whose GPS coordinates fall
   outside the Fiji bounding box or whose accuracy exceeds 50 m.
 - **FR-003**: The system MUST enforce a maximum of
@@ -575,6 +670,107 @@ passive tracing, and leaderboard systems.
   A 7-day map streak MUST award `MAP_POINTS_MAP_STREAK_7` (35 pts) via a
   `pointsLedger` entry of type `streak_bonus`.
 
+### Safety, Moderation & Trust
+
+- **FR-028**: Every map feature submission MUST pass synchronously through a
+  keyword-and-pattern content screener before any database rows are written. The
+  screener checks `name` and `description` against a blocklist compiled from
+  `@hakwa/core/map-blocklist.json` at server startup (no per-request DB reads).
+  Outcomes: (a) `pass` — feature created with `status = "pending"` and points
+  awarded normally; (b) `flag` — feature created with
+  `status = "pending_review"`, a moderator alert enqueued, and **no**
+  `pointsLedger` entry created until admin clears it; (c) `auto_reject` —
+  submission refused with `422 MAP_CONTENT_VIOLATION` and no rows created.
+
+- **FR-029**: Contribution points for a `pending_review` feature are withheld
+  until an admin clears the feature. When an admin issues the `approve` action
+  on a `pending_review` feature, the system MUST atomically create the
+  `pointsLedger` entry (type `map_contribution`, and `map_photo_bonus` if
+  applicable) and update `mapContributorStats` in the **same transaction** as
+  the `status` transition to `"pending"`.
+
+- **FR-030**: Any authenticated user who is not the original contributor MAY
+  report a `mapFeature` in `pending` or `active` state exactly once via
+  `POST /map/features/:id/report`, supplying a `reason` and optional `note`. The
+  `(featureId, reporterId)` pair must be unique. Reporting a feature in any
+  other status MUST return `409 MAP_VOTING_CLOSED`. Reporting one's own
+  contribution MUST return `403 MAP_CANNOT_REPORT_OWN`.
+
+- **FR-031**: When the distinct reporter count on a `mapFeature` reaches
+  `MAP_REPORT_AUTO_REVIEW_THRESHOLD` (3), the system MUST hold a row-level lock
+  on `mapFeature` during the threshold check to prevent race-condition
+  double-transitions. On threshold, the feature MUST atomically transition to
+  `under_review`, be removed from all public map layers (pending and active),
+  and push a notification to the original contributor: _"A feature you submitted
+  is currently under community review."_
+
+- **FR-032**: Admin-facing moderation endpoints MUST be protected by middleware
+  that confirms `admin` or `map_moderator` role before any business logic
+  executes; any other caller receives `403 Forbidden`.
+  `GET /admin/map/moderation/queue` returns features in `pending_review` and
+  `under_review` state, paginated 20 per page, sorted oldest-first.
+  `POST /admin/map/features/:id/moderate` accepts actions: `approve`, `reject`,
+  `warn_contributor`, `ban_contributor`.
+
+- **FR-033**: Every successful call to `POST /admin/map/features/:id/moderate`
+  MUST produce an append-only `mapModerationLog` row containing `featureId`,
+  `actorId` (admin's user ID), `action`, optional `reason`, and `createdAt`.
+  Rows MUST never be updated or deleted — the log is an immutable audit trail.
+
+- **FR-034**: When an admin approves an `under_review` feature (restoring it to
+  `active`), the contributor MUST receive a push notification: _"Your map
+  feature has been reviewed and restored — thanks for contributing!"_ When an
+  admin rejects any feature under review, the contributor MUST receive: _"A map
+  feature you submitted was removed after review. Please see our Community
+  Guidelines."_ No `pointsLedger` reversal is performed on rejection of a
+  previously-awarded contribution.
+
+- **FR-035**: A contributor's trust tier MUST be computed dynamically at request
+  time from `mapContributorStats.acceptedContributions` and
+  `mapContributorTrust.isMapBanned`. Tiers (from weakest to strongest): (a)
+  `standard` — default for all users, or any user with `isMapBanned = true`; (b)
+  `trusted` — `acceptedContributions >= MAP_TRUST_MIN_ACCEPTED_TRUSTED` (5) with
+  no active ban; (c) `senior` —
+  `acceptedContributions >= MAP_TRUST_MIN_ACCEPTED_SENIOR` (20) with no active
+  ban. Trust tier MUST appear in `GET /map/stats/me` under the `trustTier`
+  field. The tier is never stored in the database — it is always derived.
+
+- **FR-036**: Trusted and Senior contributors MAY include a `disputeCategory`
+  field (`"harmful_content" | "dangerous_info" | "spam" | "duplicate"`) in their
+  `POST /map/features/:id/verify` body. When a Trusted or Senior contributor
+  casts a dispute with `disputeCategory = "harmful_content"` or
+  `"dangerous_info"`, the feature MUST immediately transition to `under_review`
+  regardless of `disputeCount`, and a moderator alert MUST be enqueued. Standard
+  contributors may include `disputeCategory` but the instant-escalation rule
+  does not apply to them. Verification points are awarded to the voter
+  regardless of tier.
+
+- **FR-037**: Every `POST /map/features` request MUST apply a GPS velocity
+  heuristic. Before inserting, the API looks up the submitter's most recent
+  `mapFeature.createdAt` and `geometryJson` centroid from the past 60 minutes.
+  If found and the haversine distance implies a velocity exceeding
+  `MAP_GPS_MAX_VELOCITY_KM_H` (250 km/h), the feature MUST be created with
+  `status = "pending_review"` and `gpsVelocityFlag = true`, and a moderator
+  alert enqueued. This lookup is folded into the same pre-insert SELECT that
+  checks the daily rate limit — no extra database round-trip is required.
+
+- **FR-038**: Every `POST /map/features` and `POST /map/features/:id/verify`
+  request MUST check `mapContributorTrust.isMapBanned` for the requesting user
+  before any business logic executes. If `isMapBanned = true`, the API MUST
+  return `403 MAP_USER_MAP_BANNED` immediately. Before the ban check, if
+  `banExpiresAt` is non-null and in the past, the ban MUST be atomically lifted
+  (`isMapBanned = false`, `banExpiresAt = null`) so the user proceeds normally
+  on this request.
+
+- **FR-039**: A nightly `map-abuse-check` job MUST scan mutual verification
+  patterns over the past 30 days. For any pair of users where each has confirmed
+  at least one feature submitted by the other, and the mutual confirmation count
+  exceeds `MAP_VOTING_RING_MUTUAL_THRESHOLD` (80%) of **both** users' total
+  confirmations in that window, both users MUST be upserted into `mapAbuseFlag`
+  with `flagType = "voting_ring"` (incrementing `occurrenceCount` on conflict).
+  The job MUST NOT automatically nullify votes or apply bans — only an explicit
+  admin action triggers those consequences.
+
 ### Key Entities
 
 - **`mapFeature`**: A single geographic feature submitted by a user. Contains
@@ -610,6 +806,31 @@ passive tracing, and leaderboard systems.
   and `processedAt`. Retained for data-quality auditing and potential future OSM
   road upstreaming.
 
+- **`mapFeatureReport`**: A single user report on a `mapFeature`. Carries
+  `featureId`, `reporterId`, `reason` (`harmful_content` | `incorrect_info` |
+  `no_longer_exists` | `duplicate`), optional `note`, `status` (`open` |
+  `reviewed_actioned` | `reviewed_dismissed`), and `createdAt`. Unique on
+  `(featureId, reporterId)`.
+
+- **`mapContributorTrust`**: One safety-state row per user who has ever been
+  banned or flagged. Carries `userId`, `isMapBanned` (boolean), `banReason`
+  (nullable), `banExpiresAt` (nullable — null means permanent), and
+  `contentFlagCount` (incremented on each admin content-violation rejection).
+  Absence of a row implies `isMapBanned = false` and zero flags; row is created
+  lazily on first ban or flag event.
+
+- **`mapModerationLog`**: An append-only audit trail of every admin action via
+  the moderation endpoint. Carries `featureId` (nullable FK — set to null if the
+  feature is later hard-deleted), `actorId` (the admin's user ID), `action`,
+  optional `reason`, and `createdAt`. Rows are insert-only; never updated or
+  deleted.
+
+- **`mapAbuseFlag`**: Flags raised by the nightly abuse-detection job. Carries
+  `userId`, `flagType` (`voting_ring` | `gps_velocity_cluster`),
+  `occurrenceCount` (incremented via upsert on repeat detection),
+  `lastDetectedAt`, and `reviewedAt` (nullable — set by an admin on review).
+  Unique on `(userId, flagType)`.
+
 ### Non-Functional Requirements
 
 - **NFR-001**: The pending features bounding-box query MUST respond in under 500
@@ -629,236 +850,44 @@ passive tracing, and leaderboard systems.
 - **NFR-006**: Badge evaluation and leaderboard updates triggered by map actions
   MUST execute asynchronously after the primary transaction (consistent with
   Principle IX / Principle X) and MUST NOT block the HTTP response.
+- **NFR-007**: The content-screening step in `POST /map/features` MUST run
+  synchronously and add no more than 50 ms to P99 latency. The blocklist MUST be
+  compiled into an in-memory `Set<string>` and `RegExp[]` at server startup from
+  `@hakwa/core/map-blocklist.json` — zero per-request database reads.
+- **NFR-008**: All admin moderation endpoints (`/api/v1/admin/map/...`) MUST be
+  served from a separate router protected by a role-validation middleware layer
+  that checks `admin` or `map_moderator` role before any database access occurs,
+  independently of the standard session-auth middleware. A caller without the
+  required role receives `403 Forbidden` with no further processing.
 
 ---
 
-## Data Model
+## Success Criteria _(mandatory)_
 
-### New tables (additions to `pkg/db/schema/`)
+### Measurable Outcomes
 
-#### `mapFeature` — `pkg/db/schema/map.ts`
+- **SC-001**: A map feature submission endpoint responds within 200 ms at P99
+  under normal load — verified by integration benchmark tests.
+- **SC-002**: The pending-features bounding-box query responds in under 500 ms
+  for a 10 km × 10 km box containing up to 1,000 pending features — enforced by
+  a spatial index on `mapFeature.geometry` and validated in the db-layer test
+  suite.
+- **SC-003**: The active-features GeoJSON endpoint is served from a Redis-cached
+  response (TTL 60 s) — verified by asserting zero database calls on the second
+  request within the TTL window.
+- **SC-004**: Content screening adds no more than 50 ms to P99 request latency —
+  verified by a dedicated unit benchmark test with a worst-case blocklist size.
+- **SC-005**: A feature reaches `active` status after exactly 3 independent
+  confirmation votes, with zero races producing premature activation — verified
+  by concurrent-request integration tests.
+- **SC-006**: The 20-contributions-per-day-per-user rate limit is enforced with
+  zero bypass in automated tests; the 201st request receives
+  `RATE_LIMIT_EXCEEDED` (HTTP 429).
+- **SC-007**: Badge evaluation and leaderboard updates complete asynchronously
+  with zero blocking of the HTTP response — verified by asserting response
+  return before background job completion in unit tests.
 
-| Column          | Type                           | Notes                                                                                     |
-| --------------- | ------------------------------ | ----------------------------------------------------------------------------------------- |
-| `id`            | `uuid` PK                      | Random UUID                                                                               |
-| `contributorId` | `text` FK → `user.id`          | The user who submitted this feature                                                       |
-| `type`          | `text` enum                    | `poi` \| `road_correction` \| `area` \| `route_stop`                                      |
-| `name`          | `varchar(200)`                 | Display name of the feature                                                               |
-| `category`      | `varchar(100)`                 | POI category (e.g., `market`, `taxi_stand`, `school`, `ferry_terminal`, `bus_stop`, etc.) |
-| `description`   | `text` (nullable)              | Free-text detail                                                                          |
-| `geometryJson`  | `text`                         | GeoJSON geometry string (Point / LineString / Polygon); validated at API boundary         |
-| `photoUrl`      | `text` (nullable)              | URL of the contributor's photo evidence                                                   |
-| `status`        | `text` enum                    | `pending` \| `active` \| `rejected` \| `stale`                                            |
-| `confirmCount`  | `integer` default 0            | Number of confirm votes received                                                          |
-| `disputeCount`  | `integer` default 0            | Number of dispute votes received                                                          |
-| `osmRef`        | `varchar(50)` nullable         | OSM node/way/relation ID for corrections targeting an existing element                    |
-| `osmLicence`    | `varchar(10)` default `"ODbL"` | Licence tag required for upstream OSM contribution                                        |
-| `gpxAccuracyM`  | `numeric(6,2)` nullable        | GPS accuracy in metres at time of submission                                              |
-| `createdAt`     | `timestamp` not null           | Submission time                                                                           |
-| `updatedAt`     | `timestamp` not null           | Last status change time                                                                   |
-| `expiresAt`     | `timestamp` nullable           | Set to `createdAt + 60 days` on insert; cleared on activation                             |
+### Design Artifacts
 
-Index: B-tree on `status`; spatial index on `geometryJson` (via a generated
-column or PostGIS, TBD by the implementation plan).
-
-#### `mapVerification` — `pkg/db/schema/map.ts`
-
-| Column      | Type                        | Notes                                                    |
-| ----------- | --------------------------- | -------------------------------------------------------- |
-| `id`        | `uuid` PK                   | Random UUID                                              |
-| `featureId` | `uuid` FK → `mapFeature.id` | The feature being verified                               |
-| `userId`    | `text` FK → `user.id`       | The user casting the vote                                |
-| `vote`      | `text` enum                 | `confirm` \| `dispute`                                   |
-| `note`      | `text` nullable             | Optional free-text explanation (especially for disputes) |
-| `createdAt` | `timestamp` not null        |                                                          |
-
-Unique constraint: `(featureId, userId)`.
-
-#### `mapContributorStats` — `pkg/db/schema/map.ts`
-
-| Column                  | Type                  | Notes                                 |
-| ----------------------- | --------------------- | ------------------------------------- |
-| `id`                    | `uuid` PK             |                                       |
-| `userId`                | `text` FK → `user.id` | Unique                                |
-| `totalContributions`    | `integer` default 0   | All submissions regardless of outcome |
-| `acceptedContributions` | `integer` default 0   | Features that reached `active`        |
-| `totalVerifications`    | `integer` default 0   | All votes cast (confirm + dispute)    |
-| `updatedAt`             | `timestamp` not null  | Whenever any counter changes          |
-
----
-
-### Schema changes to existing tables
-
-#### `pkg/db/schema/gamification.ts` — `PointsSourceAction` enum
-
-Seven new values appended to the existing union (three from initial spec, four
-new engagement mechanic actions):
-
-```
-"map_contribution"          // user submits a new map feature (+25 pts)
-"map_verification"          // user casts a confirm/dispute vote (+5 pts)
-"map_contribution_accepted" // contributor's pending feature reaches active (+50 pts)
-"map_photo_bonus"           // extra reward for photo-backed submission (+10 pts)
-"map_road_trace"            // driver passive GPS trace novel km (+1 pt/km)
-"map_mission_completed"     // all 3 weekly missions completed (+100 pts)
-"map_pioneer_bonus"         // first to map a zone (+75 pts)
-```
-
-#### Named constants (in `pkg/db/schema/gamification.ts` or `@hakwa/core`)
-
-```typescript
-export const MAP_POINTS_CONTRIBUTION = 25 as const;
-export const MAP_POINTS_VERIFICATION = 5 as const;
-export const MAP_POINTS_ACCEPTED = 50 as const;
-export const MAP_POINTS_PHOTO_BONUS = 10 as const;
-export const MAP_POINTS_ROAD_TRACE_PER_KM = 1 as const;
-export const MAP_ROAD_TRACE_DAILY_CAP_PTS = 50 as const;
-export const MAP_POINTS_MISSION_BONUS = 100 as const;
-export const MAP_POINTS_PIONEER_BONUS = 75 as const;
-export const MAP_POINTS_MAP_STREAK_7 = 35 as const;
-export const MAP_MISSIONS_PER_WEEK = 3 as const;
-export const MAP_ACTIVATION_THRESHOLD = 3 as const; // confirm votes needed
-export const MAP_REJECTION_THRESHOLD = 3 as const; // dispute votes to reject
-export const MAP_DAILY_CONTRIBUTION_LIMIT = 20 as const; // per user per UTC day
-export const MAP_DAILY_VERIFICATION_LIMIT = 200 as const; // per user per UTC day
-export const MAP_GPS_MAX_ACCURACY_M = 50 as const; // metres
-export const MAP_STALE_DAYS = 60 as const; // days before stale
-export const MAP_PROXIMITY_WARN_M = 10 as const; // metres duplicate check
-export const MAP_ROAD_NOVEL_THRESHOLD_M = 20 as const; // metres from known feature
-export const MAP_PIONEER_MAX_KNOWN_COUNT = 10 as const; // zone size above which pioneer label fades
-```
-
----
-
-### New badges (seed data for `badge` table)
-
-| `key`                    | `name`             | Description                                            | `applicableTo`           |
-| ------------------------ | ------------------ | ------------------------------------------------------ | ------------------------ |
-| `map_first_contribution` | First Mapper       | Submitted your first map feature                       | `passenger` + `operator` |
-| `map_10_accepted`        | Road Builder       | Had 10 map features accepted by the community          | `passenger` + `operator` |
-| `map_50_accepted`        | Local Expert       | Had 50 map features accepted                           | `passenger` + `operator` |
-| `map_25_verifications`   | Community Checker  | Cast 25 verification votes                             | `passenger` + `operator` |
-| `map_100_verifications`  | Community Guardian | Cast 100 verification votes                            | `passenger` + `operator` |
-| `map_cartographer`       | Cartographer       | 200+ combined mapping actions; holds Expert + Guardian | `passenger` + `operator` |
-| `map_photo_10`           | Picture Perfect    | Submitted 10 contributions with photo evidence         | `passenger` + `operator` |
-| `map_pioneer`            | First Explorer     | First to map a previously-empty Hakwa zone             | `passenger` + `operator` |
-| `map_explorer`           | Zone Explorer      | First to map 3 or more distinct zones                  | `passenger` + `operator` |
-| `map_zone_complete`      | Zone Champion      | Contributed to a zone that reached 100% completion     | `passenger` + `operator` |
-| `map_mission_4_streak`   | Mission Veteran    | Completed all 3 missions in 4 consecutive weeks        | `passenger` + `operator` |
-
-> Because badges are data-driven (Principle VII) these are seed rows in the
-> `badge` table — no code changes are needed to add future mapping badges.
-
----
-
-## Architecture Notes
-
-### Package placement
-
-| Concern                             | Package                              |
-| ----------------------------------- | ------------------------------------ |
-| DB schema & Drizzle types           | `@hakwa/db` (`pkg/db/schema/map.ts`) |
-| Constants (thresholds, limits)      | `@hakwa/core`                        |
-| Coordinate & GeoJSON validation     | `@hakwa/core`                        |
-| Map contribution REST routes        | `api/src/routes/map.ts`              |
-| Badge evaluation (map actions)      | Extended worker in `@hakwa/workers`  |
-| Redis leaderboard helpers           | `@hakwa/redis`                       |
-| Offline contribution queue (mobile) | `@hakwa/api-client`                  |
-| `<ContributionSheet />` UI          | `@hakwa/ui-native`                   |
-| `<VerificationCard />` UI           | `@hakwa/ui-native`                   |
-| Community Map mode (web)            | `@hakwa/ui-web`                      |
-
-### Real-time delivery
-
-When a feature transitions to `active`, a Redis pub/sub message is published to
-`map:features:activated`, consumed by the WebSocket server, and broadcast to all
-clients subscribed to the affected bounding box. Clients update their map layer
-immediately — no polling required, consistent with Principle V.
-
-### Offline queue (mobile)
-
-The `@hakwa/api-client` package adds a `mapContributionQueue` backed by
-`AsyncStorage` (Expo). Pending-submit contributions are stored locally with a
-`queued` flag. On connectivity restoration (NetInfo event), the queue is drained
-sequentially. Queued contributions carry device-recorded GPS coordinates and
-timestamp; the server records both the device timestamp and the server-receipt
-timestamp for auditing. Points are only awarded after server-side validation
-succeeds.
-
-### Mission scheduler
-
-A weekly cron job running Monday UTC midnight creates three `mapMission` rows.
-Mission templates (action type, target count, optional zone scope) are seeded as
-a JSON config in `api/src/jobs/`. The scheduler picks three templates per week —
-optionally weighting toward under-mapped zones or low-count feature types.
-`mapMissionProgress` rows are created lazily on first user interaction, not
-bulk-inserted for all users, to avoid O(users) write storms on Monday.
-
-### Zone progress and pioneer detection
-
-Zone membership is determined by a point-in-polygon check against `mapZone`
-GeoJSON polygons run inside `api/src/services/mapZone.ts`. This runs
-synchronously inside the feature-activation service function, just after the
-`mapFeature` status update commits.
-
-Zone counter updates use an atomic
-`UPDATE map_zone SET current_feature_count = current_feature_count + 1 WHERE id = $id RETURNING current_feature_count`.
-No row-level lock is needed because the increment is commutative. The pioneer
-bonus is conditionally awarded only when `RETURNING current_feature_count = 1`.
-
-Zone completion percentage is written to Redis
-(`HSET map:zone:{id} pct {value} featureCount {n}`) after each increment.
-Threshold notifications (50%, 100%) are triggered by comparing the pre- and
-post-increment percentage bands within the same service call.
-
-### Passive road-trace worker
-
-The road-trace worker in `@hakwa/workers` receives the driver's trip GPS trace
-as a GeoJSON LineString after the trip completes. It simplifies the line using
-the Ramer–Douglas–Peucker algorithm, then checks each 50 m segment against the
-active `mapFeature` layer (bbox + distance query) for novelty. Novel km is
-floored to an integer and the result persisted in `mapRoadTrace`. The raw
-coordinate array MUST NOT be sent to any external analytics service.
-
-### ODbL upstream pipeline (future)
-
-All `mapFeature` rows with `status = "active"` and `osmLicence = "ODbL"` are
-candidates for OSM upstream contribution via the OSM Changeset API. A separate,
-out-of-scope tooling job (not part of this feature) will periodically export
-accepted features as OSM XML changesets. The `osmRef` column links corrections
-back to existing OSM elements. This feature MUST NOT attempt to push data to OSM
-automatically — that process requires human review.
-
----
-
-## Open Questions
-
-1. **Photo storage**: Where are contributor photos stored? (S3 / Cloudflare R2 /
-   local filesystem?) The implementation plan should decide and add the
-   presigned URL endpoint.
-2. **PostGIS vs TEXT-GeoJSON**: Does the current Postgres instance have PostGIS
-   enabled? If not, spatial queries run on parsed GeoJSON TEXT with application-
-   layer filtering — acceptable for Fiji's data volumes but a PostGIS migration
-   should be prioritised.
-3. **Leaderboard scope**: Is one national leaderboard sufficient for Phase 1, or
-   do we need per-island (Viti Levu / Vanua Levu) leaderboards immediately?
-4. **Moderation escalation**: Should heavily disputed features (e.g.,
-   `disputeCount ≥ 5` without resolution) be escalated to a Hakwa admin review
-   queue, or is automatic rejection sufficient for Phase 1?
-5. **OSM contributor agreement**: Contributors should ideally confirm they agree
-   to release their submissions under ODbL. Should this be a one-time in-app
-   consent screen on first contribution, or is the platform's Terms of Service
-   sufficient?
-6. **Zone boundary definitions**: Who defines and maintains the GeoJSON polygons
-   for `mapZone`? Options: (a) manually authored polygons, (b) imported from
-   Fiji Bureau of Statistics administrative-boundary shapefiles, or (c) derived
-   algorithmically from the OSM Fiji extract. An admin seeding interface or a
-   one-time seeding script must be specified before FR-024 is implemented.
-7. **Road-trace privacy consent**: Passive tracing records GPS coordinates while
-   drivers are working. Does the opt-in toggle in settings constitute sufficient
-   consent under Fiji's data protection framework, or is a more explicit
-   disclosure required? Legal review recommended before FR-022 ships.
-8. **Mission content pipeline**: Who authors the weekly mission templates — a
-   hardcoded rotation, an admin UI, or an algorithmic selection based on which
-   zones or feature types are most sparse? This must be decided before the
-   mission scheduler job is built.
+- Data model: [data-model.md](data-model.md)
+- Architecture notes and open questions: [plan.md](plan.md)
