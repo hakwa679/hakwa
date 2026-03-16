@@ -255,5 +255,10 @@ export async function seedNotificationPreferences(
 
 // Re-export types and schemas for consumers
 export type { SendNotificationPayload, NotificationChannel };
-export { SendNotificationSchema, NotificationTypeSchema, NotificationChannelSchema, DeviceRegistrationSchema };
+export {
+  SendNotificationSchema,
+  NotificationTypeSchema,
+  NotificationChannelSchema,
+  DeviceRegistrationSchema,
+};
 export { startNotificationWorker } from "./worker.ts";

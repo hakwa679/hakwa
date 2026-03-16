@@ -1,13 +1,13 @@
 {
-  "name": "@hakwa/workers",
-  "version": "0.0.1",
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
-  },
-  "dependencies": {
-    "@hakwa/db": "*",
-    "@hakwa/notifications": "*",
-    "@hakwa/redis": "*"
-  }
+    "name": "@hakwa/workers",
+    "version": "0.0.1",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "@hakwa/db": "*",
+        "@hakwa/notifications": "*",
+        "@hakwa/redis": "*"
+    }
 }

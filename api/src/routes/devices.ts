@@ -101,7 +101,12 @@ deviceRouter.delete(
     await db
       .update(device)
       .set({ active: false })
-      .where(and(eq(device.id, String(id)), eq(device.userId, String(session.user.id))));
+      .where(
+        and(
+          eq(device.id, String(id)),
+          eq(device.userId, String(session.user.id)),
+        ),
+      );
 
     res.status(204).send();
   },

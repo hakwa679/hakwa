@@ -4,7 +4,10 @@ import db from "@hakwa/db";
 import { notification, notificationPreference } from "@hakwa/db/schema";
 import { redis } from "@hakwa/redis";
 import { getSessionFromRequest } from "@hakwa/auth";
-import { NotificationTypeSchema, NotificationChannelSchema } from "@hakwa/notifications";
+import {
+  NotificationTypeSchema,
+  NotificationChannelSchema,
+} from "@hakwa/notifications";
 
 export const notificationsRouter = Router();
 
@@ -20,7 +23,10 @@ notificationsRouter.get(
   "/me/notification-preferences",
   async (req: Request, res: Response): Promise<void> => {
     const session = await getSessionFromRequest(req);
-    if (!session) { res.status(401).json({ error: "Unauthorized" }); return; }
+    if (!session) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
 
     const rows = await db
       .select()
@@ -28,7 +34,10 @@ notificationsRouter.get(
       .where(eq(notificationPreference.userId, session.user.id));
 
     // Group by type
-    const byType: Record<string, Array<{ channel: string; enabled: boolean; locked: boolean }>> = {};
+    const byType: Record<
+      string,
+      Array<{ channel: string; enabled: boolean; locked: boolean }>
+    > = {};
     for (const row of rows) {
       const isSystemAlert = row.type === "system_alert";
       if (!byType[row.type]) byType[row.type] = [];
@@ -51,10 +60,15 @@ notificationsRouter.patch(
   "/me/notification-preferences/:type/:channel",
   async (req: Request, res: Response): Promise<void> => {
     const session = await getSessionFromRequest(req);
-    if (!session) { res.status(401).json({ error: "Unauthorized" }); return; }
+    if (!session) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
 
     const typeParsed = NotificationTypeSchema.safeParse(req.params["type"]);
-    const channelParsed = NotificationChannelSchema.safeParse(req.params["channel"]);
+    const channelParsed = NotificationChannelSchema.safeParse(
+      req.params["channel"],
+    );
 
     if (!typeParsed.success || !channelParsed.success) {
       res.status(400).json({ error: "Invalid notification type or channel" });
@@ -62,7 +76,9 @@ notificationsRouter.patch(
     }
 
     if (typeParsed.data === "system_alert") {
-      res.status(403).json({ error: "system_alert preferences cannot be modified" });
+      res
+        .status(403)
+        .json({ error: "system_alert preferences cannot be modified" });
       return;
     }
 
@@ -95,7 +111,11 @@ notificationsRouter.patch(
       return;
     }
 
-    res.json({ type: updated.type, channel: updated.channel, enabled: updated.enabled });
+    res.json({
+      type: updated.type,
+      channel: updated.channel,
+      enabled: updated.enabled,
+    });
   },
 );
 
@@ -111,11 +131,15 @@ notificationsRouter.get(
   "/",
   async (req: Request, res: Response): Promise<void> => {
     const session = await getSessionFromRequest(req);
-    if (!session) { res.status(401).json({ error: "Unauthorized" }); return; }
+    if (!session) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
 
     const rawLimit = req.query["limit"];
     const rawUnread = req.query["unread"];
-    const cursor = typeof req.query["cursor"] === "string" ? req.query["cursor"] : undefined;
+    const cursor =
+      typeof req.query["cursor"] === "string" ? req.query["cursor"] : undefined;
 
     const limit = Math.min(
       Number.isFinite(Number(rawLimit)) ? Number(rawLimit) : 20,
@@ -144,9 +168,10 @@ notificationsRouter.get(
     const rows = await query;
     const hasMore = rows.length > limit;
     const data = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore && data.length > 0
-      ? encodeCursor(data[data.length - 1]!.createdAt)
-      : null;
+    const nextCursor =
+      hasMore && data.length > 0
+        ? encodeCursor(data[data.length - 1]!.createdAt)
+        : null;
 
     res.json({ data, nextCursor, totalUnread: unreadCount });
   },
@@ -159,7 +184,10 @@ notificationsRouter.get(
   "/unread-count",
   async (req: Request, res: Response): Promise<void> => {
     const session = await getSessionFromRequest(req);
-    if (!session) { res.status(401).json({ error: "Unauthorized" }); return; }
+    if (!session) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
 
     const count = await getUnreadCount(session.user.id);
     res.json({ count });
@@ -174,10 +202,16 @@ notificationsRouter.patch(
   "/:id/read",
   async (req: Request, res: Response): Promise<void> => {
     const session = await getSessionFromRequest(req);
-    if (!session) { res.status(401).json({ error: "Unauthorized" }); return; }
+    if (!session) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
 
     const { id } = req.params;
-    if (!id) { res.status(400).json({ error: "Missing notification id" }); return; }
+    if (!id) {
+      res.status(400).json({ error: "Missing notification id" });
+      return;
+    }
 
     const [row] = await db
       .select()
@@ -185,8 +219,14 @@ notificationsRouter.patch(
       .where(eq(notification.id, String(id)))
       .limit(1);
 
-    if (!row) { res.status(404).json({ error: "Notification not found" }); return; }
-    if (row.userId !== session.user.id) { res.status(403).json({ error: "Forbidden" }); return; }
+    if (!row) {
+      res.status(404).json({ error: "Notification not found" });
+      return;
+    }
+    if (row.userId !== session.user.id) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
 
     if (row.readAt !== null) {
       // Already read — idempotent 409
@@ -198,7 +238,12 @@ notificationsRouter.patch(
     await db
       .update(notification)
       .set({ readAt: now })
-      .where(and(eq(notification.id, String(id)), eq(notification.userId, String(session.user.id))));
+      .where(
+        and(
+          eq(notification.id, String(id)),
+          eq(notification.userId, String(session.user.id)),
+        ),
+      );
 
     // Decrement Redis unread counter (floor at 0)
     const current = await getUnreadCount(session.user.id);
@@ -218,7 +263,10 @@ notificationsRouter.post(
   "/mark-all-read",
   async (req: Request, res: Response): Promise<void> => {
     const session = await getSessionFromRequest(req);
-    if (!session) { res.status(401).json({ error: "Unauthorized" }); return; }
+    if (!session) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
 
     const result = await db
       .update(notification)
