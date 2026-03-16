@@ -7,9 +7,9 @@
     },
     "types": "./index.ts",
     "dependencies": {
-        "ioredis": "^5.6.1"
+        "ioredis": "latest"
     },
     "devDependencies": {
-        "@types/node": "^22.0.0"
+        "@types/node": "latest"
     }
 }

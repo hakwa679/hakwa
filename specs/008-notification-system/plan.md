@@ -9,7 +9,7 @@
 ## Summary
 
 Multi-channel notification system (push, in-app, email, SMS) built on three
-pillars: Expo Push Notification Service (`@expo/server-sdk`) for mobile push
+pillars: Expo Push Notification Service (`expo-server-sdk`) for mobile push
 delivery, Redis Streams for async dispatch, and a `notification` + `device`
 schema for persistence and audit. Push tokens are registered per-device and
 automatically deactivated on `DeviceNotRegistered` EPN receipts. In-app
@@ -22,12 +22,12 @@ notifications.
 ## Technical Context
 
 **Language/Version**: TypeScript 5.x (strict mode)  
-**Primary Dependencies**: `@expo/server-sdk`, `@hakwa/db`, `@hakwa/redis`,
+**Primary Dependencies**: `expo-server-sdk`, `@hakwa/db`, `@hakwa/redis`,
 `@hakwa/email`, `@hakwa/errors`, `ws`  
 **Storage**: PostgreSQL (`notification`, `device` tables in
 `pkg/db/schema/notification.ts`); Redis (dispatch Stream `notifications:outbox`,
 in-app pub/sub `user:{userId}:notifications`)  
-**Testing**: Vitest; mock `@expo/server-sdk` Expo.sendPushNotificationsAsync;
+**Testing**: Vitest; mock `expo-server-sdk` Expo.sendPushNotificationsAsync;
 mock Redis Stream consumer  
 **Target Platform**: Node.js API; React Native Expo (Rider, Driver, Merchant
 apps); React + Vite (web portals)  
@@ -92,6 +92,10 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
       optimistic mark-as-read; skeleton list on first load; deep-link from push
       tap.
 - [ ] **XVII. Mapping** — N/A. No map UI in this feature.
+- [x] **XVIII. Official Documentation First** — `expo-server-sdk` (correct
+      package name and v6 API), `expo-notifications` token registration API, and
+      Redis Streams consumer group commands verified against official docs
+      before implementation.
 
 ## Project Structure
 
@@ -115,7 +119,7 @@ pkg/
 ├── db/schema/notification.ts        ← notification, device tables exported via @hakwa/db
 └── notifications/src/
     ├── index.ts                     ← sendNotification(), sendPush(), sendEmail(), sendSms()
-    ├── expoPush.ts                  ← @expo/server-sdk batch send + receipt handler
+    ├── expoPush.ts                  ← expo-server-sdk batch send + receipt handler
     └── worker.ts                    ← Redis Stream consumer (notifications:outbox)
 
 api/

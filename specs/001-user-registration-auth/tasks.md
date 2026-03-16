@@ -22,15 +22,15 @@ Auth, Drizzle ORM, PostgreSQL, Redis, Expo SecureStore
 
 **Purpose**: Schema changes and shared constants before any code is written
 
-- [ ] T001 Extend `user` table with `role`, `phone`, `isLocked`, `lockedUntil`,
+- [x] T001 Extend `user` table with `role`, `phone`, `isLocked`, `lockedUntil`,
       `lastLoginAt` columns in `pkg/db/schema/auth-schema.ts`
-- [ ] T002 Create `userProfile` table (`id`, `userId`, `onboardingComplete`,
+- [x] T002 Create `userProfile` table (`id`, `userId`, `onboardingComplete`,
       `avatarUrl`, `createdAt`, `updatedAt`) in `pkg/db/schema/auth-schema.ts`
-- [ ] T003 Export `userProfile` and updated `user` schema from
+- [x] T003 Export `userProfile` and updated `user` schema from
       `pkg/db/schema/index.ts`
-- [ ] T004 [P] Create `pkg/core/src/authConstants.ts` with
+- [x] T004 [P] Create `pkg/core/src/authConstants.ts` with
       `AUTH_LOCKOUT_MAX_ATTEMPTS` and `AUTH_LOCKOUT_DURATION_SECONDS`
-- [ ] T005 Run `db-push` to apply schema to database and confirm tables are
+- [x] T005 Run `db-push` to apply schema to database and confirm tables are
       correct
 
 ---
@@ -42,21 +42,21 @@ exist before any auth route can function
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T006 Configure Better Auth instance in `pkg/auth/lib/auth.ts` (Drizzle
+- [x] T006 Configure Better Auth instance in `pkg/auth/lib/auth.ts` (Drizzle
       adapter, `requireEmailVerification: true`, custom schema for `role` and
       `phone` fields)
-- [ ] T007 Implement `authHandler` and `registerAuthRoutes` in
+- [x] T007 Implement `authHandler` and `registerAuthRoutes` in
       `pkg/auth/lib/server.ts` — mount Better Auth handler at `/auth/*` on the
       Express app
-- [ ] T008 [P] Implement `checkLockout`, `recordFailedAttempt`, and
+- [x] T008 [P] Implement `checkLockout`, `recordFailedAttempt`, and
       `clearLockout` functions in `api/src/middleware/lockout.ts` using
       `@hakwa/redis` INCR/EXPIRE
-- [ ] T009 [P] Implement `getSessionFromRequest` helper in
+- [x] T009 [P] Implement `getSessionFromRequest` helper in
       `pkg/auth/lib/server.ts` — extract Bearer token (mobile) or session cookie
       (web) and call Better Auth session lookup
-- [ ] T010 Export `auth`, `authHandler`, `registerAuthRoutes`,
+- [x] T010 Export `auth`, `authHandler`, `registerAuthRoutes`,
       `getSessionFromRequest` from `pkg/auth/index.ts`
-- [ ] T011 Mount auth routes in `api/src/index.ts` using `registerAuthRoutes`
+- [x] T011 Mount auth routes in `api/src/index.ts` using `registerAuthRoutes`
 
 **Checkpoint**: Foundation complete — Better Auth handler is live, lockout
 middleware is ready
@@ -104,10 +104,10 @@ sign-out invalidates all sessions.
 app restart restores session via `GET /api/auth/session`; sign-out calls
 `POST /auth/sign-out` and returns to sign-in screen.
 
-- [ ] T018 [US2] Implement lockout check in sign-in flow — before Better Auth
+- [x] T018 [US2] Implement lockout check in sign-in flow — before Better Auth
       sign-in, call `checkLockout` in `api/src/middleware/lockout.ts`; on
       failure call `recordFailedAttempt`; on success call `clearLockout`
-- [ ] T019 [US2] Add `GET /api/auth/session` route in `api/src/routes/auth.ts` —
+- [x] T019 [US2] Add `GET /api/auth/session` route in `api/src/routes/auth.ts` —
       requires auth, returns `{ user, session }` using `getSessionFromRequest`
 - [ ] T020 [US2] Implement session restore on app launch in
       `apps/mobile/rider/src/_layout.tsx` — read token from Expo SecureStore,
@@ -201,7 +201,7 @@ with a 60-second cooldown.
 second call within 60 s returns `429 RESEND_COOLDOWN`; verification email
 arrives and can be used.
 
-- [ ] T039 [US5] Implement `POST /api/auth/resend-verification` route in
+- [x] T039 [US5] Implement `POST /api/auth/resend-verification` route in
       `api/src/routes/auth.ts` — check Redis cooldown key (60 s TTL), send email
       via `@hakwa/email`, set cooldown key
 - [ ] T040 [US5] On sign-in with unverified email (`403 EMAIL_NOT_VERIFIED`),
@@ -215,14 +215,14 @@ cooldown
 
 ## Final Phase: Polish & Cross-Cutting Concerns
 
-- [ ] T041 [P] Wrap all auth errors as `AppError` subclasses and validate they
+- [x] T041 [P] Wrap all auth errors as `AppError` subclasses and validate they
       pass through Express error middleware in `api/src/index.ts`
-- [ ] T042 [P] Verify no stack traces appear in any auth error response payload
+- [x] T042 [P] Verify no stack traces appear in any auth error response payload
       (production safety check)
-- [ ] T043 [P] Ensure `lastLoginAt` on the `user` record is updated on every
+- [x] T043 [P] Ensure `lastLoginAt` on the `user` record is updated on every
       successful sign-in by hooking into Better Auth's `onSignIn` callback in
       `pkg/auth/lib/auth.ts`
-- [ ] T044 [P] Verify account enumeration prevention on
+- [x] T044 [P] Verify account enumeration prevention on
       `POST /auth/forgot-password` and `POST /api/auth/resend-verification` —
       both must return `200` regardless of whether email exists
 - [ ] T045 Add E2E smoke test script in

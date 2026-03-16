@@ -1,16 +1,18 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.14.0 → 1.14.1
+Version change: 1.14.1 → 1.15.0
 Modified principles: XVII. Mapping — tile strategy narrowed to self-hosted
   Fiji-extract tiles only; public OSM tile CDN forbidden in production;
   tile extract tooling (tilemaker / Planetiler) and bounding-box constraint
   documented
-Added sections: N/A
+Added sections: XVIII. Official Documentation First — implementers must consult
+  official online docs before any installation, scaffolding, API usage,
+  version selection, migration, or configuration step
 Removed sections: N/A
 Templates updated:
   ✅ .specify/memory/constitution.md — this file
-  ✅ .specify/templates/plan-template.md — no structural changes required
+  ✅ .specify/templates/plan-template.md — XVIII check added to Constitution Check
   ✅ .specify/templates/spec-template.md — no structural changes required
   ✅ .specify/templates/tasks-template.md — no structural changes required
 Deferred TODOs: none
@@ -1262,6 +1264,63 @@ significant ongoing operating cost, removes third-party data-sharing obligations
 for sensitive location data, and keeps the platform viable at any scale without
 billing surprises.
 
+### XVIII. Official Documentation First
+
+Whenever implementing anything that involves a third-party package, framework,
+service, CLI tool, or protocol, the implementer MUST consult that dependency's
+**official documentation online** before writing, scaffolding, or configuring
+any code. This is non-negotiable.
+
+#### What this requires
+
+- **Installation and scaffolding**: The official "Getting Started" or
+  "Installation" page MUST be checked for the current recommended command.
+  Memorised `npm install` invocations or scaffolding commands from previous
+  projects MUST NOT be used — they may reference renamed packages, deprecated
+  CLI flags, or obsolete generators.
+- **API surface**: Every function call, configuration key, hook signature, or
+  schema option MUST be verified against the documentation for the version
+  actually being installed. APIs change between major versions; assumptions
+  about past behaviour are not acceptable.
+- **Version selection**: The official changelog, release notes, and migration
+  guide MUST be consulted before pinning or upgrading a version. "Latest" is the
+  default starting point; downgrading MUST be explicitly justified with a
+  reference to a known issue documented by the maintainers.
+- **Migration paths**: When updating an existing dependency, the official
+  migration guide (not community blog posts) is the authoritative source. If no
+  official guide exists, the upgrade MUST be flagged as higher risk in the plan.
+- **Configuration**: Default config values, recommended environment setups, and
+  peer-dependency requirements MUST be sourced from the official docs — not
+  inferred from framework defaults or prior project memory.
+
+#### Scope
+
+This principle applies to every agent, developer, or automated tool generating
+code or configuration for Hakwa. It applies to:
+
+- New package installations.
+- Scaffold commands (`npx create-*`, `expo install`, framework CLIs).
+- Any integration with an external service (auth providers, email, SMS, maps,
+  push notifications, payment rails).
+- Configuration of build tools (Vite, `tsc`, Expo, Drizzle).
+- API contracts with services Hakwa calls (Nominatim, OSRM, EPN).
+
+#### When documentation conflicts with this constitution
+
+If the official documentation for a package recommends an approach that
+contradicts a principle in this constitution (e.g., the library's scaffolder
+writes inline SQL instead of using Drizzle), the **constitution's architectural
+intent takes precedence**. The conflict MUST be documented in the plan's
+Constitution Check section before proceeding.
+
+**Rationale**: The root cause of most version-related bugs, deprecated API
+usage, and security exposure in this codebase is implementation from memory
+rather than from current documentation. Package APIs, configuration formats, CLI
+flags, and recommended patterns change between major versions — sometimes
+dramatically. Building from memory silently creates hidden breaking changes and
+forces expensive rework. Checking the official source takes minutes; fixing a
+production incident caused by an outdated API takes days.
+
 | Layer              | Technology                                                                                                      |
 | ------------------ | --------------------------------------------------------------------------------------------------------------- |
 | Language           | TypeScript 5.x (strict, NodeNext modules)                                                                       |
@@ -1330,4 +1389,4 @@ agreements. Amendments require:
 All feature plans (`plan.md`) MUST include a Constitution Check section that
 gates work on compliance with principles I–V before Phase 1 begins.
 
-**Version**: 1.14.1 | **Ratified**: 2026-03-16 | **Last Amended**: 2026-03-16
+**Version**: 1.15.0 | **Ratified**: 2026-03-16 | **Last Amended**: 2026-03-17

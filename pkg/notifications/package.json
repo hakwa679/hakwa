@@ -10,10 +10,10 @@
         "@hakwa/db": "*",
         "@hakwa/redis": "*",
         "@hakwa/email": "*",
-        "expo-server-sdk": "^3.14.0",
-        "zod": "^3.24.2"
+        "expo-server-sdk": "latest",
+        "zod": "latest"
     },
     "devDependencies": {
-        "@types/node": "^22.0.0"
+        "@types/node": "latest"
     }
 }

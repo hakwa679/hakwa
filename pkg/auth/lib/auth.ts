@@ -1,4 +1,5 @@
 import db from "@hakwa/db";
+import { user as userTable } from "@hakwa/db/schema";
 import {
   notificationPreference,
   NOTIFICATION_TYPES,
@@ -7,6 +8,7 @@ import {
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { sendEmail } from "@hakwa/email";
+import { eq } from "drizzle-orm";
 
 const auth = betterAuth({
   secret: process.env["BETTER_AUTH_SECRET"]!,
@@ -38,6 +40,40 @@ const auth = betterAuth({
       });
     },
   },
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        required: false,
+        defaultValue: "passenger",
+        input: true,
+      },
+      phone: {
+        type: "string",
+        required: false,
+        defaultValue: null,
+        input: true,
+      },
+      isLocked: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+        input: false,
+      },
+      lockedUntil: {
+        type: "date",
+        required: false,
+        defaultValue: null,
+        input: false,
+      },
+      lastLoginAt: {
+        type: "date",
+        required: false,
+        defaultValue: null,
+        input: false,
+      },
+    },
+  },
   databaseHooks: {
     user: {
       create: {
@@ -55,6 +91,17 @@ const auth = betterAuth({
             .insert(notificationPreference)
             .values(rows)
             .onConflictDoNothing();
+        },
+      },
+    },
+    session: {
+      create: {
+        after: async (newSession: { userId: string }) => {
+          // Update lastLoginAt on every new session (sign-in)
+          await db
+            .update(userTable)
+            .set({ lastLoginAt: new Date() })
+            .where(eq(userTable.id, newSession.userId));
         },
       },
     },

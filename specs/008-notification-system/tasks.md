@@ -5,7 +5,7 @@ description: "Task list for Notification System"
 # Tasks: Notification System
 
 **Feature Branch**: `008-notification-system` **Input**: plan.md, spec.md,
-data-model.md **Tech Stack**: TypeScript 5.x, `@expo/server-sdk`, Drizzle ORM,
+data-model.md **Tech Stack**: TypeScript 5.x, `expo-server-sdk`, Drizzle ORM,
 PostgreSQL, Redis Streams (`notifications:outbox`), Redis pub/sub
 (`user:{userId}:notifications`), `@hakwa/workers`, `@hakwa/notifications`,
 `@hakwa/email`
@@ -29,7 +29,7 @@ can dispatch or persist notifications
       `pkg/notifications/package.json` (name `@hakwa/notifications`, version
       `0.0.1`, `exports: { ".": "./src/index.ts" }`, `types: "./src/index.ts"`,
       workspace peer deps on `@hakwa/db`, `@hakwa/redis`, `@hakwa/email`,
-      `@expo/server-sdk`); create `pkg/notifications/tsconfig.json` extending
+      `expo-server-sdk`); create `pkg/notifications/tsconfig.json` extending
       root tsconfig with `strict: true`; register in root `package.json`
       workspaces array; verify
       `import { sendNotification } from     '@hakwa/notifications'` resolves in

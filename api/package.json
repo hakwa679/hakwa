@@ -15,19 +15,20 @@
   },
   "dependencies": {
     "@hakwa/auth": "*",
+    "@hakwa/core": "*",
     "@hakwa/db": "*",
     "@hakwa/email": "*",
     "@hakwa/notifications": "*",
     "@hakwa/redis": "*",
-    "dotenv": "^17.3.1",
-    "express": "^5.2.1",
-    "node-cron": "^4.2.1",
-    "ws": "^8.19.0"
+    "dotenv": "latest",
+    "express": "latest",
+    "node-cron": "latest",
+    "ws": "latest"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/node-cron": "^3.0.11",
-    "@types/ws": "^8.18.1",
-    "tsx": "^4.21.0"
+    "@types/express": "latest",
+    "@types/node-cron": "latest",
+    "@types/ws": "latest",
+    "tsx": "latest"
   }
 }

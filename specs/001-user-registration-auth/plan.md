@@ -80,6 +80,9 @@ _Post-design gate — all principles evaluated against this feature's design._
       (loading/success/error) on all auth forms; error messages include recovery
       action; two-step confirmation not needed for registration.
 - [ ] **XVII. Mapping** — _Not applicable_: no map UI in auth flows.
+- [x] **XVIII. Official Documentation First** — Better Auth installation,
+      Drizzle adapter config, and Expo SecureStore API verified against official
+      docs before implementation; no memorised invocations used.
 
 ---
 

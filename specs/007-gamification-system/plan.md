@@ -79,6 +79,10 @@ concurrent updates at O(log N)
 - [x] **XVI. UX Principles** — Silent points credit is not acceptable (per
       spec); in-app event fires immediately after Redis publish reaches
       WebSocket server.
+- [ ] **XVII. Mapping** — _Not applicable_: no map UI in gamification.
+- [x] **XVIII. Official Documentation First** — Redis `ZADD`/`ZREVRANGE`
+      leaderboard commands, Drizzle unique-constraint definition, and
+      `expo-notifications` badge-count API verified against official docs.
 
 ---
 

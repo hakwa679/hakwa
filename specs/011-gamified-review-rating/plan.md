@@ -40,7 +40,7 @@ via `gamification:events` Redis Stream post-commit.
 ## Constitution Check
 
 | Principle                   | Ref    | Status | Notes                                                                                                                                          |
-| --------------------------- | ------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| --------------------------- | ------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | --- | -------------------------- | ------ | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | I. Auth required            | FR-001 | [x]    | All `/api/v1/reviews/*` endpoints use `requireAuth`; `GET /users/:id/reputation` also authenticated                                            |
 | II. TypeScript strict       | FR-002 | [x]    | `ReviewDirection`, `ReviewTagKey`, `SubmitReviewRequest` types in `@hakwa/types`                                                               |
 | III. Drizzle schema         | FR-003 | [x]    | `reviewTag`, `tripReview`, `tripReviewTag` in `pkg/db/schema/review.ts`; exported from `@hakwa/db`                                             |
@@ -57,7 +57,7 @@ via `gamification:events` Redis Stream post-commit.
 | XIV. Notifications          | FR-014 | [x]    | Post-trip push notification prompts review; `review:revealed` event triggers "Your review is now visible" push                                 |
 | XV. Map integration         | FR-015 | N/A    | No map features in review system                                                                                                               |
 | XVI. ODbL compliance        | FR-016 | N/A    | No map contributions                                                                                                                           |
-| XVII. Schema migrations     | FR-017 | [x]    | `db-push` applies review tables and `trip.completedAt` column additively; `seedReviewTags.ts` run post-migration                               |
+| XVII. Schema migrations     | FR-017 | [x]    | `db-push` applies review tables and `trip.completedAt` column additively; `seedReviewTags.ts` run post-migration                               |     | XVIII. Official Docs First | FR-018 | [x] | Drizzle unique-constraint syntax, Redis `XADD` stream publish, and `expo-notifications` scheduling API verified against official docs; no API signatures assumed from memory. |
 
 ---
 

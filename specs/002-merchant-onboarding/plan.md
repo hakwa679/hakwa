@@ -70,6 +70,9 @@ defaulting to one tier
 - [x] **XVI. UX Principles** — Progress indicator on wizard; inline validation;
       three states per submit; clear status banner on dashboard.
 - [ ] **XVII. Mapping** — _Not applicable_: no map UI in onboarding.
+- [x] **XVIII. Official Documentation First** — Drizzle schema API, Better Auth
+      role fields, and Express Router patterns verified against official docs;
+      no version pinned from memory.
 
 ---
 

@@ -37,25 +37,26 @@ polling worker every 15 seconds.
 
 ## Constitution Check
 
-| Principle                   | Ref    | Status | Notes                                                                                                                     |
-| --------------------------- | ------ | ------ | ------------------------------------------------------------------------------------------------------------------------- |
-| I. Auth required            | FR-001 | [x]    | All safety endpoints use `requireAuth` middleware; share/:token is explicitly public                                      |
-| II. TypeScript strict       | FR-002 | [x]    | `SmsService` interface, `safetyIncident` types in `@hakwa/types`                                                          |
-| III. Drizzle schema         | FR-003 | [x]    | 4 tables in `pkg/db/schema/safety.ts`; exported from `@hakwa/db`                                                          |
-| IV. AppError                | FR-004 | [x]    | `SAFETY_NO_ACTIVE_TRIP`, `SAFETY_SOS_ALREADY_ACTIVE`, `SAFETY_CONTACT_LIMIT_REACHED`, etc. all defined in `@hakwa/errors` |
-| V. Redis pub/sub real-time  | FR-005 | [x]    | `redis.publish('safety:sos', ...)` on SOS trigger; WebSocket server relays to safety team channel                         |
-| VI. Redis Stream async work | FR-006 | [x]    | SMS dispatch via `safety:sms:outbox` Redis Stream; check-in escalation via polling worker                                 |
-| VII. Gamification hooks     | FR-007 | [x]    | No gamification for safety events by design — no points awarded for triggering SOS                                        |
-| VIII. Idempotency           | FR-008 | [x]    | SOS: application-level check before insert; formal reports: `UNIQUE(tripId, reporterId, type)`                            |
-| IX. Cursor pagination       | FR-009 | [x]    | `GET /incidents` paginates by `createdAt` cursor                                                                          |
-| X. Worker CPU offload       | FR-010 | [x]    | Check-in escalation polling worker in `@hakwa/workers`; SMS worker also in workers package                                |
-| XI. AppError codes          | FR-011 | [x]    | All 13 error codes defined in contracts/rest-api.md; registered in `@hakwa/errors`                                        |
-| XII. Mobile sessions        | FR-012 | [x]    | Session read via `getSessionFromRequest`; silent SOS path reuses same auth token                                          |
-| XIII. Fare integrity        | FR-013 | N/A    | Safety does not touch fare ledger                                                                                         |
-| XIV. Notifications          | FR-014 | [x]    | Push notification on check-in prompt; SMS via Twilio on SOS; fallback push if SMS fails                                   |
-| XV. Map integration         | FR-015 | [x]    | Location snapshot stored as GeoJSON in `locationSnapshotJson`; live-share reads from Redis location hash                  |
-| XVI. ODbL compliance        | FR-016 | N/A    | No map feature contributions in safety system                                                                             |
-| XVII. Schema migrations     | FR-017 | [x]    | `db-push` applies safety tables; `merchantStatusEnum` extended additively                                                 |
+| Principle                   | Ref    | Status | Notes                                                                                                                                                                       |
+| --------------------------- | ------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I. Auth required            | FR-001 | [x]    | All safety endpoints use `requireAuth` middleware; share/:token is explicitly public                                                                                        |
+| II. TypeScript strict       | FR-002 | [x]    | `SmsService` interface, `safetyIncident` types in `@hakwa/types`                                                                                                            |
+| III. Drizzle schema         | FR-003 | [x]    | 4 tables in `pkg/db/schema/safety.ts`; exported from `@hakwa/db`                                                                                                            |
+| IV. AppError                | FR-004 | [x]    | `SAFETY_NO_ACTIVE_TRIP`, `SAFETY_SOS_ALREADY_ACTIVE`, `SAFETY_CONTACT_LIMIT_REACHED`, etc. all defined in `@hakwa/errors`                                                   |
+| V. Redis pub/sub real-time  | FR-005 | [x]    | `redis.publish('safety:sos', ...)` on SOS trigger; WebSocket server relays to safety team channel                                                                           |
+| VI. Redis Stream async work | FR-006 | [x]    | SMS dispatch via `safety:sms:outbox` Redis Stream; check-in escalation via polling worker                                                                                   |
+| VII. Gamification hooks     | FR-007 | [x]    | No gamification for safety events by design — no points awarded for triggering SOS                                                                                          |
+| VIII. Idempotency           | FR-008 | [x]    | SOS: application-level check before insert; formal reports: `UNIQUE(tripId, reporterId, type)`                                                                              |
+| IX. Cursor pagination       | FR-009 | [x]    | `GET /incidents` paginates by `createdAt` cursor                                                                                                                            |
+| X. Worker CPU offload       | FR-010 | [x]    | Check-in escalation polling worker in `@hakwa/workers`; SMS worker also in workers package                                                                                  |
+| XI. AppError codes          | FR-011 | [x]    | All 13 error codes defined in contracts/rest-api.md; registered in `@hakwa/errors`                                                                                          |
+| XII. Mobile sessions        | FR-012 | [x]    | Session read via `getSessionFromRequest`; silent SOS path reuses same auth token                                                                                            |
+| XIII. Fare integrity        | FR-013 | N/A    | Safety does not touch fare ledger                                                                                                                                           |
+| XIV. Notifications          | FR-014 | [x]    | Push notification on check-in prompt; SMS via Twilio on SOS; fallback push if SMS fails                                                                                     |
+| XV. Map integration         | FR-015 | [x]    | Location snapshot stored as GeoJSON in `locationSnapshotJson`; live-share reads from Redis location hash                                                                    |
+| XVI. ODbL compliance        | FR-016 | N/A    | No map feature contributions in safety system                                                                                                                               |
+| XVII. Schema migrations     | FR-017 | [x]    | `db-push` applies safety tables; `merchantStatusEnum` extended additively                                                                                                   |
+| XVIII. Official Docs First  | FR-018 | [x]    | Twilio SMS API, `crypto.randomBytes` usage, and `expo-location` accuracy constants verified against official docs before implementation; no API shapes assumed from memory. |
 
 ---
 

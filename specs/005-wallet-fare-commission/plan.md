@@ -71,6 +71,12 @@ partial-index on `holderId` ensures query performance
       between fare-estimate worker and trip completion service.
 - [x] **XVI. UX Principles** — Real-time balance update on merchant wallet
       screen; receipt available immediately after trip completes.
+- [ ] **XVII. Mapping** — _Not applicable_: no map UI in wallet or fare
+      features.
+- [x] **XVIII. Official Documentation First** — Drizzle `numeric` column type,
+      Redis pub/sub patterns, and TanStack Query `invalidateQueries` API
+      verified against official docs; no fare logic copied from prior-project
+      memory.
 
 ---
 

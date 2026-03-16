@@ -73,6 +73,9 @@ go offline while `on_trip`; offers expire in 30 s
       optimistic status transitions; earnings shown immediately post-completion.
 - [x] **XVII. Mapping** — Driver navigation screen via `@hakwa/map`; OSRM
       directions to pickup and dropoff; no Google Maps / Mapbox.
+- [x] **XVIII. Official Documentation First** — OSRM route API, Redis Streams
+      (`XADD`/`XREADGROUP`) commands, and Expo Location API verified against
+      official docs before implementation.
 
 ---
 

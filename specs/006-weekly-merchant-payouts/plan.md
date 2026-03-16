@@ -70,6 +70,10 @@ parallel bank calls)
 - [x] **XVI. UX Principles** — "Next payout: [date]" visible on Earnings screen
       without settings navigation; failed payout detail explains "funds remain
       in wallet".
+- [ ] **XVII. Mapping** — _Not applicable_: no map UI in payout features.
+- [x] **XVIII. Official Documentation First** — `node-cron` schedule syntax,
+      Drizzle `insert().onConflictDoNothing()`, and `worker_threads`
+      `workerData` API verified against official docs before implementation.
 
 ---
 

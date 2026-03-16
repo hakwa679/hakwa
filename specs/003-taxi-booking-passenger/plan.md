@@ -79,6 +79,10 @@ concurrent trips
       shown before booking.
 - [x] **XVII. Mapping** — All map UI via `@hakwa/map`; OSM tiles from env var;
       Nominatim geocoding; OSRM routing; no Google Maps or Mapbox.
+- [x] **XVIII. Official Documentation First** — `react-native-maps`,
+      `react-leaflet`, Nominatim, and OSRM APIs verified against official docs
+      before implementation; Expo SDK install commands sourced from official
+      Expo docs.
 
 ---
 
