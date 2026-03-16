@@ -1,122 +1,123 @@
-# Implementation Plan: Notification System
+# Implementation Plan: [FEATURE]
 
-**Branch**: `008-notification-system` | **Date**: 2026-03-16 | **Spec**:
-[spec.md](./spec.md) **Input**: Feature specification from
-`/specs/008-notification-system/spec.md`
+**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
+
+**Note**: This template is filled in by the `/speckit.plan` command. See
+`.specify/templates/plan-template.md` for the execution workflow.
 
 ## Summary
 
-A multi-channel notification system delivering push (via Expo EPN), in-app (via
-WebSocket), email, and SMS notifications across all platform events — trip
-lifecycle (13 event types), financial events, gamification milestones, and
-re-engagement reminders. Notifications are persisted before dispatch; delivery
-is fully asynchronous via a Redis Streams → `@hakwa/workers` worker pipeline.
-User preferences are enforced per type-and-channel. A new `@hakwa/notifications`
-workspace package centralises all sender adapters, the dispatch orchestrator,
-retry/back-off helpers, and payload builders. New DB tables (`notification`,
-`device`, `notificationPreference`) are added to
-`pkg/db/schema/notification.ts`. The API exposes CRUD endpoints for notification
-history, unread counts, device registration, and preference management. Frontend
-surfaces include a notification centre (paginated list), unread badge, and
-preference settings screen.
+[Extract from feature spec: primary requirement + technical approach from
+research]
 
 ## Technical Context
 
-**Language/Version**: TypeScript 5.x strict mode, Node.js 22.x LTS  
-**Primary Dependencies**: Drizzle ORM, `@expo/server-sdk` (Expo EPN),
-`@hakwa/redis` (Redis Streams), `@hakwa/workers` (worker threads),
-`@hakwa/email`, `@hakwa/errors`, `@hakwa/types`, `@hakwa/api-client`  
-**Storage**: PostgreSQL via Drizzle — three new tables: `notification`,
-`device`, `notification_preference`  
-**Testing**: Vitest (unit + integration); notification dispatch mocked at sender
-adapter boundary  
-**Target Platform**: Linux server (API worker), React Native Expo (mobile push +
-notification centre), React/Vite (web notification centre)  
-**Project Type**: API feature + shared package (`@hakwa/notifications`) +
-frontend screens  
-**Performance Goals**: Notification delivered to client within 3 seconds of the
-triggering event (SC-001); unread count updated within 1 second of mark-as-read
-(SC-004)  
-**Constraints**: Dispatch MUST NOT block the HTTP request path; push tokens
-invalidated immediately on EPN rejection; retry up to configurable max with
-exponential back-off; `system_alert` non-opt-outable; idempotency enforced via
-`eventReferenceId`  
-**Scale/Scope**: All user types (passenger, driver, merchant); 16 notification
-types; 4 channels; daily inactivity job covering all passengers
+<!--
+  ACTION REQUIRED: Replace the content in this section with the technical details
+  for the project. The structure here is presented in advisory capacity to guide
+  the iteration process.
+-->
+
+**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS
+CLARIFICATION]  
+**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
+**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
+**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
+**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
+**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app
+or NEEDS CLARIFICATION]  
+**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps
+or NEEDS CLARIFICATION]  
+**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory,
+offline-capable or NEEDS CLARIFICATION]  
+**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS
+CLARIFICATION]
 
 ## Constitution Check
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-- [x] **I. Package-First** — New `@hakwa/notifications` package in
-      `pkg/notifications/`; new DB schema in `pkg/db/schema/notification.ts`; no
-      notification logic inlined in `api/` or `apps/`.
-- [x] **II. Type Safety** — All DB types from Drizzle
-      `$inferSelect`/`$inferInsert`; notification payloads validated at API
-      boundary (Zod); `any` forbidden.
-- [x] **III. Security** — WebSocket notification delivery uses existing
-      `getSessionFromRequest` auth; push tokens stored server-side only;
-      SMS/email provider keys from env vars; `eventReferenceId` prevents
-      injection via duplicated events.
-- [x] **IV. Schema Contract** — `notification`, `device`,
-      `notification_preference` tables defined in
-      `pkg/db/schema/notification.ts` and exported through `@hakwa/db` before
-      any service code consumes them.
-- [x] **V. Real-Time** — In-app notifications delivered via Redis pub/sub →
-      WebSocket worker fan-out (Principle V architecture); no DB polling;
-      heartbeat maintained per existing ws server config.
-- [x] **VI. Redis Package** — Redis Streams and pub/sub accessed exclusively via
-      `@hakwa/redis`; `REDIS_URL` from env.
-- [x] **VIII. Concurrency Safety** — `eventReferenceId` unique constraint on
-      `notification` table enforces idempotency for double-fired events (FR-013,
-      FR-014); push token deactivation is idempotent (UPDATE WHERE active =
-      true); notification status transitions use conditional UPDATE
-      (`WHERE status = 'pending'`).
-- [x] **IX. Webhook-First** — All post-commit notification triggers dispatched
-      via Redis Stream event (never inlined in the primary transaction); stream
-      consumer is idempotent; delivery worker retries with exponential back-off
-      per outbound webhook pattern.
-- [x] **X. Worker-Thread Concurrency** — Notification delivery worker runs in
-      `@hakwa/workers` pool; stream consumption, preference lookup, and all
-      channel sends happen off the main thread; worker does not import Express
-      or WebSocket singletons.
-- [x] **XI. Unified Error Handling** — Sender adapter failures surfaced as
-      `AppError` from `@hakwa/errors`; worker errors serialised and propagated
-      through pool; API route errors handled by central Express error
-      middleware; WebSocket delivery errors use
-      `{ type: "error", code, message }` envelope.
-- [x] **XII. Frontend Architecture** — `NotificationType`,
-      `NotificationChannel`, `NotificationRecord`, `DeviceRegistration`,
-      `NotificationPreference` types defined in `@hakwa/types`; query hooks
-      (`useNotifications`, `useUnreadCount`, `useNotificationPreferences`) in
-      `@hakwa/api-client`; no hardcoded URLs; mobile via `EXPO_PUBLIC_*`, web
-      via `VITE_*`.
-- [x] **XIII. Shared-First Reuse** — Notification service logic in
-      `api/src/services/notification-service.ts`; all channel senders in
-      `@hakwa/notifications` (not per-app); notification centre UI components in
-      `@hakwa/ui-native` / `@hakwa/ui-web`.
-- [x] **XIV. Notification System** _(this feature delivers the system)_ —
-      Persisted before dispatch ✓; Redis Stream → worker ✓; `device` table for
-      push tokens ✓; preferences respected (except `system_alert`) ✓; all 13
-      platform triggers ✓; `@hakwa/notifications` as sole send path ✓; retry
-      with back-off ✓.
-- [x] **XV. UI Design System** — Notification centre and preference screens use
-      `@hakwa/tokens` slate palette; unread badge uses `color.accent`;
-      read/unread states from token system; touch targets ≥ 44 × 44 pt; loading
-      skeletons for async list.
-- [x] **XVI. UX Principles** — Optimistic mark-as-read (count decrements
-      immediately); skeleton screens on notification centre open; three states
-      per async op; empty state with CTA ("You're all caught up"); unread count
-      badge visible in nav bar at all times; preference toggles use verb-first
-      labels ("Receive push notifications for…"); `system_alert` shown as locked
-      with reason.
+- [ ] **I. Package-First** — New shared logic placed in `pkg/<name>` workspace
+      package, not inlined in `api/` or `apps/`.
+- [ ] **II. Type Safety** — No `any` without justification; DB types derived
+      from Drizzle `$inferSelect`/`$inferInsert`; external inputs validated at
+      boundary.
+- [ ] **III. Security** — WebSocket endpoints require session auth; secrets from
+      env only; input sanitized before use.
+- [ ] **IV. Schema Contract** — New entities defined in `pkg/db/schema/` first;
+      `db-push` run before consuming code is written.
+- [ ] **V. Real-Time** — User-facing state changes published to Redis and
+      delivered to clients via WebSocket; no direct DB polling for real-time
+      events; heartbeat kept active; connection lifecycle events logged.
+- [ ] **VI. Redis Package** — Redis client sourced from `@hakwa/redis` package;
+      `REDIS_URL` env var configured; no bespoke Redis setup in app code.
+- [ ] **VIII. Concurrency Safety** — Wallet/points mutations use
+      `SELECT … FOR     UPDATE`; trip transitions use conditional updates with
+      `AND status =     <expected>`; payout batches rely on unique constraint +
+      no-op on conflict; multi-step Redis operations use Lua or `MULTI/EXEC`;
+      external-trigger operations are idempotent.
+- [ ] **IX. Webhook-First** — Inbound webhooks verify signature before
+      processing, return `2xx` immediately and process async; handlers are
+      idempotent; internal post-commit side effects dispatched via Redis
+      Streams, not inlined in transactions; outbound dispatches from worker with
+      exponential back-off; all webhook helpers sourced from `@hakwa/webhooks`.
+- [ ] **X. Worker-Thread Concurrency** — CPU-bound work (fare calculation,
+      payout batch, gamification scans, report generation, crypto ops) offloaded
+      to `@hakwa/workers` pool; no direct `new Worker()` calls in app code;
+      worker message schemas typed and validated; workers do not import Express,
+      WebSocket, or Redis singletons; unhandled worker errors caught and logged.
+- [ ] **XI. Unified Error Handling** — All errors thrown as `AppError` subclass
+      from `@hakwa/errors`; single Express error middleware writes all HTTP
+      error responses; WebSocket errors use `{ type: "error", code, message }`
+      envelope; worker errors serialised and propagated as `AppError`; no stack
+      traces or internals in response payloads; every boundary error logged with
+      `requestId`, `code`, `httpStatus`, and `stack`.
+- [ ] **XII. Frontend Architecture** — API/WS types defined in `@hakwa/types`;
+      all HTTP calls via `@hakwa/api-client` Axios instance; TanStack Query
+      hooks sourced from `@hakwa/api-client`; no hardcoded URLs; mobile uses
+      `EXPO_PUBLIC_*` env vars; web uses `VITE_*` env vars; shared components in
+      `@hakwa/ui-native` / `@hakwa/ui-web`; no duplicate type definitions across
+      the frontend/backend boundary.
+- [ ] **XIII. Shared-First Reuse** — No logic duplicated across apps; new
+      cross-platform utilities in `@hakwa/core`; UI primitives in
+      `@hakwa/ui-native` / `@hakwa/ui-web`; multi-use hooks extracted to the
+      appropriate shared package; service logic in `api/src/services/`, not
+      inlined in route handlers; PR includes justification for any intentional
+      duplication.
+- [ ] **XIV. Notification System** — All notifications persisted before
+      dispatch; dispatch via Redis Stream → worker (never inline/blocking); push
+      tokens stored in `device` table; user preferences respected (except
+      `system_alert`); engagement triggers (gamification, trip lifecycle,
+      financial, re-engagement) implemented; all senders via
+      `@hakwa/notifications`; failed deliveries retried with back-off.
+- [ ] **XV. UI Design System** — All colours from `@hakwa/tokens` slate palette;
+      no raw colour/spacing/radius values in components; typography uses defined
+      scale and weights only; single icon library; loading states shown for all
+      async ops > 200 ms; motion uses token durations and respects
+      `prefers-reduced-motion`; contrast ≥ 4.5:1 body / 3:1 UI; touch targets ≥
+      44 × 44 pt; dark mode as primary target.
+- [ ] **XVI. UX Principles** — Optimistic UI on predictable state changes;
+      skeleton screens on navigation; three states designed per async op
+      (loading / success / error); contextual empty states with CTA; single
+      primary action per screen in thumb zone; two-step confirmation for
+      destructive actions; fare shown before booking; offline banner + cached
+      data on no connectivity; button labels verb-first; error messages include
+      recovery action; feature tested on low-end Android at 3G before shipping.
+- [ ] **XVII. Mapping** — Map UI sourced exclusively from `@hakwa/map` (no
+      direct `react-native-maps`, `leaflet`, or commercial map SDK imports in
+      app code); OSM tile URL from `EXPO_PUBLIC_MAP_TILE_URL` /
+      `VITE_MAP_TILE_URL` env vars; geocoding via `@hakwa/map` `geocode()`
+      (Nominatim); routing via `@hakwa/map` `getRoute()` (OSRM/Valhalla);
+      attribution rendered on every map view; no Google Maps or Mapbox
+      references anywhere in this feature's code.
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/008-notification-system/
+specs/[###-feature]/
 ├── plan.md              # This file (/speckit.plan command output)
 ├── research.md          # Phase 0 output (/speckit.plan command)
 ├── data-model.md        # Phase 1 output (/speckit.plan command)
@@ -127,59 +128,57 @@ specs/008-notification-system/
 
 ### Source Code (repository root)
 
+<!--
+  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
+  for this feature. Delete unused options and expand the chosen structure with
+  real paths (e.g., apps/admin, packages/something). The delivered plan must
+  not include Option labels.
+-->
+
 ```text
-pkg/
-├── notifications/           # NEW — @hakwa/notifications
-│   ├── package.json
-│   ├── index.ts
-│   └── src/
-│       ├── types.ts         # NotificationType enum, channel enum, payload builders
-│       ├── dispatch.ts      # dispatchNotification() orchestrator
-│       ├── preferences.ts   # loadUserPreferences(), shouldSendToChannel()
-│       ├── retry.ts         # exponential back-off helpers, MAX_RETRY_COUNT constant
-│       └── senders/
-│           ├── push.ts      # Expo EPN adapter (expo-server-sdk)
-│           ├── in-app.ts    # Redis pub/sub → WebSocket fan-out adapter
-│           ├── email.ts     # @hakwa/email adapter
-│           └── sms.ts       # SMS gateway adapter (env-driven provider)
-└── db/
-    └── schema/
-        └── notification.ts  # NEW — notification, device, notificationPreference tables
-
-api/src/
-├── routes/
-│   ├── notifications.ts     # GET /notifications, PATCH /:id/read, GET /unread-count
-│   └── devices.ts           # POST /devices, DELETE /devices/:id
+# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
+src/
+├── models/
 ├── services/
-│   ├── notification-service.ts  # createAndDispatch(), triggerNotification()
-│   └── inactivity-job.ts        # Daily re-engagement cron
-└── workers/
-    └── notification-worker.ts   # Redis Stream consumer (runs in @hakwa/workers pool)
+├── cli/
+└── lib/
 
-apps/mobile/rider/src/
-├── screens/
-│   ├── NotificationCentreScreen.tsx
-│   └── NotificationPreferencesScreen.tsx
-└── components/
-    └── UnreadBadge.tsx       # (or extracted to @hakwa/ui-native if shareable)
+tests/
+├── contract/
+├── integration/
+└── unit/
 
-apps/mobile/driver/src/
-└── screens/
-    └── NotificationCentreScreen.tsx   # Same screens mirrored for driver app
+# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
+backend/
+├── src/
+│   ├── models/
+│   ├── services/
+│   └── api/
+└── tests/
 
-apps/web/src/
-└── pages/
-    ├── notifications/index.tsx        # Notification centre for web
-    └── settings/notifications.tsx     # Preference settings page
+frontend/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   └── services/
+└── tests/
+
+# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
+api/
+└── [same as backend above]
+
+ios/ or android/
+└── [platform-specific structure: feature modules, UI flows, platform tests]
 ```
 
-**Structure Decision**: Option 3 (Mobile + API) extended with shared package.
-The `@hakwa/notifications` package owns all delivery logic; `api/` owns HTTP
-routes and the stream-producing service; mobile/web apps own their notification
-UI screens.
+**Structure Decision**: [Document the selected structure and reference the real
+directories captured above]
 
 ## Complexity Tracking
 
-> No Constitution Check violations. All constraints satisfied by the
-> package-first and async-dispatch architecture already mandated by the
-> constitution.
+> **Fill ONLY if Constitution Check has violations that must be justified**
+
+| Violation                  | Why Needed         | Simpler Alternative Rejected Because |
+| -------------------------- | ------------------ | ------------------------------------ |
+| [e.g., 4th project]        | [current need]     | [why 3 projects insufficient]        |
+| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient]  |

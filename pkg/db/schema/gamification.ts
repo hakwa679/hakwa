@@ -21,7 +21,14 @@ export type PointsSourceAction =
   | "referral_trip"
   | "streak_bonus"
   | "badge_awarded"
-  | "review_submitted";
+  | "review_submitted"
+  | "map_contribution"           // user submits a new map feature
+  | "map_verification"           // user casts a confirm or dispute vote
+  | "map_contribution_accepted"  // contributor's pending feature reaches active
+  | "map_photo_bonus"            // extra reward for photo-backed submission
+  | "map_road_trace"             // driver passive GPS trace novel km
+  | "map_mission_completed"      // all 3 weekly missions completed
+  | "map_pioneer_bonus";         // first to map a zone
 
 /** Maximum number of referral bonuses a single referrer can earn. */
 export const MAX_REFERRAL_BONUSES = 50 as const;
