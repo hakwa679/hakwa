@@ -113,6 +113,37 @@ export default function RootLayout() {
           name="auth/verify-email-sent"
           options={{ title: "Verify your email" }}
         />
+        {/* Onboarding wizard — has its own nested layout with WizardProvider */}
+        <Stack.Screen
+          name="onboarding"
+          options={{ headerShown: false }}
+        />
+        {/* Fleet management */}
+        <Stack.Screen
+          name="fleet/fleet"
+          options={{
+            title: "My fleet",
+            headerStyle: { backgroundColor: "#151718" },
+            headerTintColor: "#ECEDEE",
+          }}
+        />
+        <Stack.Screen
+          name="fleet/add-vehicle"
+          options={{
+            title: "Add vehicle",
+            headerStyle: { backgroundColor: "#151718" },
+            headerTintColor: "#ECEDEE",
+          }}
+        />
+        {/* Settings */}
+        <Stack.Screen
+          name="settings/payout-account"
+          options={{
+            title: "Payout account",
+            headerStyle: { backgroundColor: "#151718" },
+            headerTintColor: "#ECEDEE",
+          }}
+        />
         <Stack.Screen
           name="modal"
           options={{ presentation: "modal", title: "Modal" }}

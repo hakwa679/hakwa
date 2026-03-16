@@ -12,6 +12,7 @@ import { attachWebSocketServer } from "./websocket.ts";
 import { deviceRouter } from "./routes/devices.ts";
 import { notificationsRouter } from "./routes/notifications.ts";
 import { authRouter } from "./routes/auth.ts";
+import { merchantsRouter } from "./routes/merchants.ts";
 import { lockoutSignInMiddleware } from "./middleware/lockout.ts";
 import { runReEngagementJob } from "./jobs/reEngagement.ts";
 
@@ -31,6 +32,7 @@ registerAuthRoutes(server);
 server.use("/api/auth", authRouter);
 server.use("/api/devices", deviceRouter);
 server.use("/api/notifications", notificationsRouter);
+server.use("/api/merchants", merchantsRouter);
 
 // WebSocket
 attachWebSocketServer(httpServer);
