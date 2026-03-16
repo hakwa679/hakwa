@@ -36,11 +36,17 @@ export const user = pgTable("user", {
 
 export const userProfile = pgTable("user_profile", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id").notNull().unique().references(() => user.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
 });
 ```
 
@@ -115,7 +121,12 @@ router.post("/resend-verification", async (req, res, next) => {
   const cooldownKey = `resend:${email}`;
   const locked = await redis.get(cooldownKey);
   if (locked) {
-    return next(new RateLimitError("RESEND_COOLDOWN", "Wait 60 seconds before resending."));
+    return next(
+      new RateLimitError(
+        "RESEND_COOLDOWN",
+        "Wait 60 seconds before resending.",
+      ),
+    );
   }
   await redis.set(cooldownKey, "1", "EX", 60);
   // delegate to Better Auth resend API
@@ -134,20 +145,27 @@ Add lockout tracking in `api/src/middleware/lockout.ts`:
 
 ```ts
 import { redis } from "@hakwa/redis";
-import { AUTH_LOCKOUT_MAX_ATTEMPTS, AUTH_LOCKOUT_DURATION_SECONDS } from "@hakwa/core";
+import {
+  AUTH_LOCKOUT_MAX_ATTEMPTS,
+  AUTH_LOCKOUT_DURATION_SECONDS,
+} from "@hakwa/core";
 import { RateLimitError } from "@hakwa/errors";
 
 export async function checkLockout(email: string) {
   const key = `auth:lockout:${email}`;
   const attempts = await redis.get(key);
   if (Number(attempts) >= AUTH_LOCKOUT_MAX_ATTEMPTS) {
-    throw new RateLimitError("ACCOUNT_LOCKED", "Account temporarily locked. Try again later.");
+    throw new RateLimitError(
+      "ACCOUNT_LOCKED",
+      "Account temporarily locked. Try again later.",
+    );
   }
 }
 
 export async function recordFailedAttempt(email: string) {
   const key = `auth:lockout:${email}`;
-  await redis.multi()
+  await redis
+    .multi()
     .incr(key)
     .expire(key, AUTH_LOCKOUT_DURATION_SECONDS)
     .exec();

@@ -9,9 +9,9 @@
 ## Overview
 
 Better Auth owns the core identity tables (`user`, `session`, `account`,
-`verification`). These are already defined in `pkg/db/schema/auth-schema.ts`
-via the Drizzle adapter. This feature adds two columns to `user` and introduces
-a `userProfile` table for extended account state.
+`verification`). These are already defined in `pkg/db/schema/auth-schema.ts` via
+the Drizzle adapter. This feature adds two columns to `user` and introduces a
+`userProfile` table for extended account state.
 
 ---
 
@@ -19,13 +19,13 @@ a `userProfile` table for extended account state.
 
 ### `user` — additive columns
 
-| New Column          | Type          | Constraint                                                  | Notes                                                 |
-| ------------------- | ------------- | ----------------------------------------------------------- | ----------------------------------------------------- |
-| `role`              | `text`        | NOT NULL, default `'passenger'`, CHECK in enum              | `'passenger' \| 'driver' \| 'merchant'`               |
-| `phone`             | `varchar(30)` | nullable                                                    | Captured at registration for drivers & merchants      |
-| `isLocked`          | `boolean`     | NOT NULL, default `false`                                   | Set true when lockout threshold exceeded              |
-| `lockedUntil`       | `timestamp`   | nullable                                                    | Null = not locked. Checked before Better Auth sign-in |
-| `lastLoginAt`       | `timestamp`   | nullable                                                    | Updated on successful sign-in                         |
+| New Column    | Type          | Constraint                                     | Notes                                                 |
+| ------------- | ------------- | ---------------------------------------------- | ----------------------------------------------------- |
+| `role`        | `text`        | NOT NULL, default `'passenger'`, CHECK in enum | `'passenger' \| 'driver' \| 'merchant'`               |
+| `phone`       | `varchar(30)` | nullable                                       | Captured at registration for drivers & merchants      |
+| `isLocked`    | `boolean`     | NOT NULL, default `false`                      | Set true when lockout threshold exceeded              |
+| `lockedUntil` | `timestamp`   | nullable                                       | Null = not locked. Checked before Better Auth sign-in |
+| `lastLoginAt` | `timestamp`   | nullable                                       | Updated on successful sign-in                         |
 
 > **Migration note**: Adding `role` with a `DEFAULT` is a safe, non-breaking
 > migration. Existing test rows become `passenger` automatically.
@@ -61,14 +61,14 @@ user_profile
 
 ### `session`
 
-| Column       | Type        | Notes                                    |
-| ------------ | ----------- | ---------------------------------------- |
-| `id`         | `text`      | PK                                       |
-| `token`      | `text`      | UNIQUE — stored by mobile in SecureStore |
-| `expiresAt`  | `timestamp` |                                          |
-| `userId`     | `text`      | FK → `user.id`                           |
-| `ipAddress`  | `text`      | nullable                                 |
-| `userAgent`  | `text`      | nullable                                 |
+| Column      | Type        | Notes                                    |
+| ----------- | ----------- | ---------------------------------------- |
+| `id`        | `text`      | PK                                       |
+| `token`     | `text`      | UNIQUE — stored by mobile in SecureStore |
+| `expiresAt` | `timestamp` |                                          |
+| `userId`    | `text`      | FK → `user.id`                           |
+| `ipAddress` | `text`      | nullable                                 |
+| `userAgent` | `text`      | nullable                                 |
 
 ### `verification`
 
@@ -93,6 +93,6 @@ user ──────────────────── userProfile (1
 
 | Value       | Description                                               |
 | ----------- | --------------------------------------------------------- |
-| `passenger` | Default role. Access to Rider App and Rider Web Portal.  |
-| `driver`    | Operator role. Access to Driver App.                     |
-| `merchant`  | Merchant/fleet owner role. Access to Merchant App/Portal.|
+| `passenger` | Default role. Access to Rider App and Rider Web Portal.   |
+| `driver`    | Operator role. Access to Driver App.                      |
+| `merchant`  | Merchant/fleet owner role. Access to Merchant App/Portal. |

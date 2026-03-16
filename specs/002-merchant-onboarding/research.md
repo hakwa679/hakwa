@@ -56,8 +56,8 @@ gates which onboarding fields are required.
 
 - Separate `licensedMerchant` / `unlicensedMerchant` tables: maximally type-
   safe but duplicates name, vehicle, and bank account relationships. Rejected.
-- A nullable `tin` column for licensed + nullable `nationalId` for unlicensed
-  on a single table: chosen approach; the constraint is enforced at the service
+- A nullable `tin` column for licensed + nullable `nationalId` for unlicensed on
+  a single table: chosen approach; the constraint is enforced at the service
   layer against `licenseType`.
 
 ---
@@ -83,8 +83,8 @@ table) linked to the `merchant` via `merchantId`.
 ## 4. Admin Notification on Submission
 
 **Decision**: On `submit_for_review`, the API dispatches a `system_alert`
-notification to all users with `role = admin` via the notification system
-(spec 008), using the Redis Stream pipeline.
+notification to all users with `role = admin` via the notification system (spec
+008), using the Redis Stream pipeline.
 
 **Rationale**:
 

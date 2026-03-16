@@ -53,10 +53,10 @@ Register a new account.
 
 **Errors**:
 
-| Status | Code                   | Condition                          |
-| ------ | ---------------------- | ---------------------------------- |
-| `422`  | `VALIDATION_ERROR`     | Weak password or invalid email     |
-| `409`  | `EMAIL_ALREADY_IN_USE` | Email already registered           |
+| Status | Code                   | Condition                      |
+| ------ | ---------------------- | ------------------------------ |
+| `422`  | `VALIDATION_ERROR`     | Weak password or invalid email |
+| `409`  | `EMAIL_ALREADY_IN_USE` | Email already registered       |
 
 ---
 
@@ -77,18 +77,24 @@ Sign in with email and password.
 
 ```json
 {
-  "user": { "id": "...", "email": "...", "name": "...", "role": "passenger", "emailVerified": true },
+  "user": {
+    "id": "...",
+    "email": "...",
+    "name": "...",
+    "role": "passenger",
+    "emailVerified": true
+  },
   "session": { "id": "...", "token": "...", "expiresAt": "ISO8601" }
 }
 ```
 
 **Errors**:
 
-| Status | Code                      | Condition                               |
-| ------ | ------------------------- | --------------------------------------- |
-| `401`  | `INVALID_CREDENTIALS`     | Wrong email or password                 |
-| `403`  | `EMAIL_NOT_VERIFIED`      | Account exists but email unverified     |
-| `429`  | `ACCOUNT_LOCKED`          | ≥ 3 consecutive failures within window  |
+| Status | Code                  | Condition                              |
+| ------ | --------------------- | -------------------------------------- |
+| `401`  | `INVALID_CREDENTIALS` | Wrong email or password                |
+| `403`  | `EMAIL_NOT_VERIFIED`  | Account exists but email unverified    |
+| `429`  | `ACCOUNT_LOCKED`      | ≥ 3 consecutive failures within window |
 
 ---
 
@@ -111,10 +117,10 @@ Invalidate the current session (and all sessions on explicit full sign-out).
 
 **Errors**:
 
-| Status | Code                    | Condition                              |
-| ------ | ----------------------- | -------------------------------------- |
-| `400`  | `INVALID_TOKEN`         | Token not found or already used        |
-| `400`  | `TOKEN_EXPIRED`         | Verification link has expired          |
+| Status | Code            | Condition                       |
+| ------ | --------------- | ------------------------------- |
+| `400`  | `INVALID_TOKEN` | Token not found or already used |
+| `400`  | `TOKEN_EXPIRED` | Verification link has expired   |
 
 ---
 
@@ -146,10 +152,10 @@ with new session.
 
 **Errors**:
 
-| Status | Code            | Condition                          |
-| ------ | --------------- | ---------------------------------- |
-| `400`  | `INVALID_TOKEN` | Token not found, expired, or used  |
-| `422`  | `WEAK_PASSWORD` | New password fails strength check  |
+| Status | Code            | Condition                         |
+| ------ | --------------- | --------------------------------- |
+| `400`  | `INVALID_TOKEN` | Token not found, expired, or used |
+| `422`  | `WEAK_PASSWORD` | New password fails strength check |
 
 ---
 
@@ -167,10 +173,10 @@ Resend the verification email. Enforces a 60-second cooldown per user.
 
 **Errors**:
 
-| Status | Code               | Condition                                        |
-| ------ | ------------------ | ------------------------------------------------ |
-| `429`  | `RESEND_COOLDOWN`  | A resend was issued less than 60 seconds ago     |
-| `404`  | Hidden (generic)   | Unknown email — returns 200 to prevent enumeration |
+| Status | Code              | Condition                                          |
+| ------ | ----------------- | -------------------------------------------------- |
+| `429`  | `RESEND_COOLDOWN` | A resend was issued less than 60 seconds ago       |
+| `404`  | Hidden (generic)  | Unknown email — returns 200 to prevent enumeration |
 
 ---
 
