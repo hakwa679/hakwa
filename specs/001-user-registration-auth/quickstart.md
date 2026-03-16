@@ -143,7 +143,7 @@ export default router;
 
 Add lockout tracking in `api/src/middleware/lockout.ts`:
 
-```ts
+````ts
 import { redis } from "@hakwa/redis";
 import {
   AUTH_LOCKOUT_MAX_ATTEMPTS,
@@ -171,10 +171,102 @@ export async function recordFailedAttempt(email: string) {
     .exec();
 }
 
-export async function clearLockout(email: string) {
-  await redis.del(`auth:lockout:${email}`);
-}
+---
+
+## E2E Smoke Test — Manual Verification Steps (T045)
+
+Run these steps after deploying (or locally with `npm run dev` in both `api/`
+and `apps/web/`).
+
+### 1 — Passenger registration
+
+```bash
+curl -s -X POST http://localhost:3000/auth/sign-up/email \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test Passenger","email":"passenger@example.com","password":"Test1234!","role":"passenger"}' \
+  | jq .
+# Expect: { "user": { "role": "passenger", ... }, "session": null }
+````
+
+### 2 — Email verification
+
+- Open the verification email in your SMTP preview tool (e.g. Mailpit at
+  `http://localhost:8025`).
+- Click the verification link → it opens the web portal at
+  `http://localhost:5173/auth/verify-email?token=<token>`.
+- Page should show "Email verified! You can now sign in."
+
+### 3 — Sign in
+
+```bash
+curl -s -X POST http://localhost:3000/auth/sign-in/email \
+  -H "Content-Type: application/json" \
+  -d '{"email":"passenger@example.com","password":"Test1234!"}' \
+  | jq .
+# Expect: { "token": "...", "user": { ... }, "session": { ... } }
 ```
+
+### 4 — Session restore
+
+```bash
+TOKEN="<token from step 3>"
+curl -s http://localhost:3000/api/auth/session \
+  -H "Authorization: Bearer $TOKEN" \
+  | jq .
+# Expect: { "user": { "email": "passenger@example.com", ... }, "session": { ... } }
+```
+
+### 5 — Resend verification (cooldown)
+
+```bash
+# With an unverified account:
+curl -s -X POST http://localhost:3000/api/auth/resend-verification \
+  -H "Content-Type: application/json" \
+  -d '{"email":"unverified@example.com"}' \
+  | jq .
+# First call: 200 { "success": true }
+# Second call within 60 s: 429 { "code": "RESEND_COOLDOWN" }
+```
+
+### 6 — Lockout after failed attempts
+
+```bash
+for i in 1 2 3 4 5 6; do
+  curl -s -X POST http://localhost:3000/auth/sign-in/email \
+    -H "Content-Type: application/json" \
+    -d '{"email":"passenger@example.com","password":"WrongPass!"}' \
+    | jq '.error // .code'
+done
+# After max attempts: 429 { "code": "ACCOUNT_LOCKED", "retryAfter": <seconds> }
+```
+
+### 7 — Password reset
+
+```bash
+curl -s -X POST http://localhost:3000/auth/forget-password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"passenger@example.com","redirectTo":"http://localhost:5173/auth/reset-password"}' \
+  | jq .
+# Expect: 200 { "success": true }  (always, even for unknown emails)
+```
+
+Open the reset email, click the link, set a new password, and verify sign-in
+works with the new password.
+
+### 8 — Driver & merchant registration
+
+Repeat steps 1–4 with `"role":"driver"` and `"role":"merchant"` respectively.
+Confirm the `role` field is persisted correctly in the `user` table.
+
+---
+
+**All steps passing** → Feature `001-user-registration-auth` is complete and
+deployed correctly.
+
+export async function clearLockout(email: string) { await
+redis.del(`auth:lockout:${email}`); }
+
+````
 
 ---
 
@@ -203,7 +295,7 @@ export async function persistSession(token: string) {
 export async function clearSession() {
   await SecureStore.deleteItemAsync(SESSION_KEY);
 }
-```
+````
 
 ---
 

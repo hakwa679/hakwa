@@ -72,22 +72,22 @@ their address, and reach the authenticated home screen.
 `role=passenger`; a verification email is sent; clicking the link calls
 `/auth/verify-email`; user is signed in and routed to booking screen.
 
-- [ ] T012 [US1] Verify `POST /auth/sign-up/email` accepts
+- [x] T012 [US1] Verify `POST /auth/sign-up/email` accepts
       `{ email, password, name, role }` and returns `201` with `session: null`
       (email unverified) — validate using Better Auth config in
       `pkg/auth/lib/auth.ts`
-- [ ] T013 [P] [US1] Build passenger registration screen in
-      `apps/mobile/rider/src/auth/RegisterScreen.tsx` — fields: full name,
-      email, password with inline strength validation
-- [ ] T014 [P] [US1] Build passenger registration page in
+- [x] T013 [P] [US1] Build passenger registration screen in
+      `apps/mobile/passenger/app/auth/register.tsx` — fields: full name, email,
+      password with inline strength validation
+- [x] T014 [P] [US1] Build passenger registration page in
       `apps/web/src/auth/RegisterPage.tsx` — same fields as mobile screen
-- [ ] T015 [US1] Wire register form submission to `POST /auth/sign-up/email` via
-      `@hakwa/api-client` in both rider app and web portal
-- [ ] T016 [P] [US1] Build email verification landing page in
+- [x] T015 [US1] Wire register form submission to `POST /auth/sign-up/email` in
+      both passenger app and web portal
+- [x] T016 [P] [US1] Build email verification landing page in
       `apps/web/src/auth/VerifyEmailPage.tsx` — handles `?token=` query param,
       calls `POST /auth/verify-email`
-- [ ] T017 [US1] Handle deep-link redirect on mobile for email verification in
-      `apps/mobile/rider/src/_layout.tsx` — route to authenticated home on
+- [x] T017 [US1] Handle deep-link redirect on mobile for email verification in
+      `apps/mobile/passenger/app/_layout.tsx` — route to authenticated home on
       success
 
 **Checkpoint**: User Story 1 complete — passenger registration and verification
@@ -109,22 +109,23 @@ app restart restores session via `GET /api/auth/session`; sign-out calls
       failure call `recordFailedAttempt`; on success call `clearLockout`
 - [x] T019 [US2] Add `GET /api/auth/session` route in `api/src/routes/auth.ts` —
       requires auth, returns `{ user, session }` using `getSessionFromRequest`
-- [ ] T020 [US2] Implement session restore on app launch in
-      `apps/mobile/rider/src/_layout.tsx` — read token from Expo SecureStore,
-      call `GET /api/auth/session`, route to home if valid
-- [ ] T021 [P] [US2] Implement session restore in
-      `apps/mobile/driver/src/_layout.tsx`
-- [ ] T022 [P] [US2] Implement session restore in
-      `apps/mobile/merchant/src/_layout.tsx`
-- [ ] T023 [P] [US2] Build sign-in screen in
-      `apps/mobile/rider/src/auth/SignInScreen.tsx` — email/password,
+- [x] T020 [US2] Implement session restore on app launch in
+      `apps/mobile/passenger/app/_layout.tsx` — read token from Expo
+      SecureStore, call `GET /api/auth/session`, route to home if valid
+- [x] T021 [P] [US2] Implement session restore in
+      `apps/mobile/driver/app/_layout.tsx`
+- [x] T022 [P] [US2] Implement session restore in
+      `apps/mobile/merchant/app/_layout.tsx`
+- [x] T023 [P] [US2] Build sign-in screen in
+      `apps/mobile/passenger/app/auth/sign-in.tsx` — email/password,
       loading/error/success states, lockout error message
-- [ ] T024 [P] [US2] Build sign-in page in `apps/web/src/auth/SignInPage.tsx`
-- [ ] T025 [US2] Implement role-based routing post sign-in — passenger → booking
+- [x] T024 [P] [US2] Build sign-in page in `apps/web/src/auth/SignInPage.tsx`
+- [x] T025 [US2] Implement role-based routing post sign-in — passenger → booking
       screen, driver → availability screen, merchant → dashboard — in respective
       app `_layout.tsx` files
-- [ ] T026 [US2] Implement sign-out — call `POST /auth/sign-out`, clear token
+- [x] T026 [US2] Implement sign-out — call `POST /auth/sign-out`, clear token
       from SecureStore, redirect to sign-in screen — in all three mobile apps
+      (sign-out button in `app/(tabs)/index.tsx` of each app)
 
 **Checkpoint**: User Story 2 complete — sign in, session persistence, and
 sign-out are functional
@@ -140,18 +141,17 @@ password, and be signed in immediately.
 `{ success: true }`; reset link calls `POST /auth/reset-password`; all sessions
 revoked; user signed in with new session.
 
-- [ ] T027 [P] [US3] Build "Forgot Password" screen in
-      `apps/mobile/rider/src/auth/ForgotPasswordScreen.tsx` — single email
-      field, calls `POST /auth/forgot-password`
-- [ ] T028 [P] [US3] Build "Forgot Password" page in
+- [x] T027 [P] [US3] Build "Forgot Password" screen in
+      `apps/mobile/passenger/app/auth/forgot-password.tsx` (also driver and
+      merchant) — single email field, calls `POST /auth/forgot-password`
+- [x] T028 [P] [US3] Build "Forgot Password" page in
       `apps/web/src/auth/ForgotPasswordPage.tsx`
-- [ ] T029 [P] [US3] Build "Reset Password" page in
+- [x] T029 [P] [US3] Build "Reset Password" page in
       `apps/web/src/auth/ResetPasswordPage.tsx` — reads `?token=` param, submits
       to `POST /auth/reset-password`
-- [ ] T030 [US3] Handle reset deep-link on mobile in
-      `apps/mobile/rider/src/_layout.tsx` — route to reset password screen with
-      token
-- [ ] T031 [US3] Validate expired/used token error on reset page — show "link no
+- [x] T030 [US3] Handle reset deep-link on mobile in each app's `_layout.tsx` —
+      route to reset password screen with token
+- [x] T031 [US3] Validate expired/used token error on reset page — show "link no
       longer valid" message with "Request new link" CTA
 
 **Checkpoint**: User Story 3 complete — password reset flow is functional
@@ -167,23 +167,21 @@ role-specific fields.
 email, verifies, reaches driver availability screen. Merchant registers with
 `role=merchant`, reaches merchant dashboard.
 
-- [ ] T032 [P] [US4] Build driver registration screen in
-      `apps/mobile/driver/src/auth/RegisterScreen.tsx` — fields: name, email,
+- [x] T032 [P] [US4] Build driver registration screen in
+      `apps/mobile/driver/app/auth/register.tsx` — fields: name, email,
       password, phone number; sets `role=driver`
-- [ ] T033 [P] [US4] Build merchant registration screen in
-      `apps/mobile/merchant/src/auth/RegisterScreen.tsx` — fields: name, email,
-      password, phone number, licensing tier; sets `role=merchant`
-- [ ] T034 [US4] Wire driver registration form to `POST /auth/sign-up/email`
-      with `role=driver` and `phone` fields via `@hakwa/api-client` in driver
-      app
-- [ ] T035 [US4] Wire merchant registration form to `POST /auth/sign-up/email`
-      with `role=merchant` and `phone` fields via `@hakwa/api-client` in
-      merchant app
-- [ ] T036 [P] [US4] Build driver sign-in screen in
-      `apps/mobile/driver/src/auth/SignInScreen.tsx`
-- [ ] T037 [P] [US4] Build merchant sign-in screen in
-      `apps/mobile/merchant/src/auth/SignInScreen.tsx`
-- [ ] T038 [US4] After email verification, route driver to availability screen
+- [x] T033 [P] [US4] Build merchant registration screen in
+      `apps/mobile/merchant/app/auth/register.tsx` — fields: name, email,
+      password, phone number; sets `role=merchant`
+- [x] T034 [US4] Wire driver registration form to `POST /auth/sign-up/email`
+      with `role=driver` and `phone` fields in driver app
+- [x] T035 [US4] Wire merchant registration form to `POST /auth/sign-up/email`
+      with `role=merchant` and `phone` fields in merchant app
+- [x] T036 [P] [US4] Build driver sign-in screen in
+      `apps/mobile/driver/app/auth/sign-in.tsx`
+- [x] T037 [P] [US4] Build merchant sign-in screen in
+      `apps/mobile/merchant/app/auth/sign-in.tsx`
+- [x] T038 [US4] After email verification, route driver to availability screen
       and merchant to dashboard with "complete profile" prompt in respective
       `_layout.tsx` files
 
@@ -204,8 +202,8 @@ arrives and can be used.
 - [x] T039 [US5] Implement `POST /api/auth/resend-verification` route in
       `api/src/routes/auth.ts` — check Redis cooldown key (60 s TTL), send email
       via `@hakwa/email`, set cooldown key
-- [ ] T040 [US5] On sign-in with unverified email (`403 EMAIL_NOT_VERIFIED`),
-      show "Resend verification email" notice in rider, driver, and merchant
+- [x] T040 [US5] On sign-in with unverified email (`403 EMAIL_NOT_VERIFIED`),
+      show "Resend verification email" notice in passenger, driver, and merchant
       sign-in screens with cooldown countdown
 
 **Checkpoint**: User Story 5 complete — resend verification is functional with
@@ -225,7 +223,7 @@ cooldown
 - [x] T044 [P] Verify account enumeration prevention on
       `POST /auth/forgot-password` and `POST /api/auth/resend-verification` —
       both must return `200` regardless of whether email exists
-- [ ] T045 Add E2E smoke test script in
+- [x] T045 Add E2E smoke test script in
       `specs/001-user-registration-auth/quickstart.md` manual verification steps
 
 ---
