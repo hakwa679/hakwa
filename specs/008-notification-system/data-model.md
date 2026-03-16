@@ -149,15 +149,15 @@ android
 
 Defined in `@hakwa/notifications/src/types.ts`:
 
-| Constant                      | Value                     | Purpose                                          |
-| ----------------------------- | ------------------------- | ------------------------------------------------ |
-| `INACTIVITY_DAYS`             | `7`                       | Days without a trip before re-engagement notif   |
-| `MAX_RETRY_COUNT`             | `5`                       | Maximum delivery retry attempts per notification |
-| `RETRY_BASE_DELAY_MS`         | `1000`                    | Initial back-off delay in milliseconds           |
-| `RETRY_MAX_DELAY_MS`          | `60000`                   | Cap on exponential back-off delay                |
-| `NOTIFICATION_STREAM_KEY`     | `'notification:dispatch'` | Redis Stream key                                 |
-| `NOTIFICATION_CONSUMER_GROUP` | `'notification-workers'`  | Redis consumer group                             |
-| `INAPP_PUBSUB_PREFIX`         | `'notification:inapp:'`   | Redis channel prefix for in-app delivery         |
+| Constant                      | Value                    | Purpose                                                                                                                |
+| ----------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `INACTIVITY_DAYS`             | `7`                      | Days without a trip before re-engagement notif                                                                         |
+| `MAX_RETRY_COUNT`             | `5`                      | Maximum delivery retry attempts per notification                                                                       |
+| `RETRY_BASE_DELAY_MS`         | `1000`                   | Initial back-off delay in milliseconds                                                                                 |
+| `RETRY_MAX_DELAY_MS`          | `60000`                  | Cap on exponential back-off delay                                                                                      |
+| `NOTIFICATION_STREAM_KEY`     | `'notifications:outbox'` | Redis Stream key (matches plan.md and worker XADD/XREAD calls)                                                         |
+| `NOTIFICATION_CONSUMER_GROUP` | `'notification-workers'` | Redis consumer group                                                                                                   |
+| `INAPP_PUBSUB_PREFIX`         | `'user:'`                | Redis channel prefix for in-app delivery — full key: `user:{userId}:notifications` (matches websocket.ts subscription) |
 
 ---
 
