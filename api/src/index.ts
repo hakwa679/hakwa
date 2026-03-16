@@ -1,14 +1,21 @@
 import express from "express";
 import "dotenv/config";
-import { sendEmail } from "@hakwa/email";
+import { createServer } from "http";
+import { registerAuthRoutes } from "@hakwa/auth";
+import { attachWebSocketServer } from "./websocket.ts";
 
 const server = express();
-server.listen(3000, async () => {
-  console.log("Server is running on port 3000");
+const httpServer = createServer(server);
+const port = process.env.PORT;
 
-  await sendEmail({
-    to: "taiatiniyara@gmail.com",
-    subject: "Test Email",
-    text: "This is a test email from Hakwa.",
-  });
+// middleware
+server.use(express.json());
+server.use(express.urlencoded({ extended: true }));
+
+registerAuthRoutes(server);
+attachWebSocketServer(httpServer);
+
+// Start the server
+httpServer.listen(port, () => {
+  console.log("[server] API is running at http://localhost:" + port);
 });

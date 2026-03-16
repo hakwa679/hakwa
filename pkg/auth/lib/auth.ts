@@ -2,12 +2,13 @@ import db from "@hakwa/db";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { sendEmail } from "@hakwa/email";
-export const auth = betterAuth({
+
+const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET!,
   baseUrl: process.env.BETTER_AUTH_URL!,
   rateLimit: {
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: 100,
     storage: "database",
   },
   database: drizzleAdapter(db, {
@@ -27,3 +28,6 @@ export const auth = betterAuth({
     },
   },
 });
+
+export { auth };
+export default auth;
