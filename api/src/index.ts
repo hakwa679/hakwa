@@ -13,8 +13,12 @@ import { deviceRouter } from "./routes/devices.ts";
 import { notificationsRouter } from "./routes/notifications.ts";
 import { authRouter } from "./routes/auth.ts";
 import { merchantsRouter } from "./routes/merchants.ts";
+import { bookingsRouter } from "./routes/bookings.ts";
+import { driverRouter } from "./routes/driver.ts";
 import { lockoutSignInMiddleware } from "./middleware/lockout.ts";
 import { runReEngagementJob } from "./jobs/reEngagement.ts";
+import { merchantWalletRouter } from "./routes/merchantWallet.ts";
+import { tripsRouter } from "./routes/trips.ts";
 
 const server = express();
 const httpServer = createServer(server);
@@ -33,6 +37,10 @@ server.use("/api/auth", authRouter);
 server.use("/api/devices", deviceRouter);
 server.use("/api/notifications", notificationsRouter);
 server.use("/api/merchants", merchantsRouter);
+server.use("/api/bookings", bookingsRouter);
+server.use("/api/driver", driverRouter);
+server.use("/api/merchant/wallet", merchantWalletRouter);
+server.use("/api/trips", tripsRouter);
 
 // WebSocket
 attachWebSocketServer(httpServer);
@@ -68,9 +76,6 @@ server.use(
     res.status(statusCode).json({ code, message });
   },
 );
-
-// WebSocket
-attachWebSocketServer(httpServer);
 
 // Start the Redis Stream worker
 startNotificationWorker().catch((err: unknown) => {

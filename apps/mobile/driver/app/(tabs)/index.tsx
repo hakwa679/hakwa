@@ -1,11 +1,49 @@
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import AvailabilityScreen from "../../src/screens/AvailabilityScreen";
+import OfferScreen from "../../src/screens/OfferScreen";
+import NavigationScreen from "../../src/screens/NavigationScreen";
+import { useDriverOfferWebSocket } from "../../src/hooks/useDriverOfferWebSocket";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
+// ---------------------------------------------------------------------------
+// Active trip state — set after the driver accepts an offer
+// ---------------------------------------------------------------------------
+
+interface ActiveTrip {
+  tripId: string;
+  pickupLat: number;
+  pickupLng: number;
+  pickupAddress: string;
+  dropoffLat?: number;
+  dropoffLng?: number;
+  dropoffAddress?: string;
+}
+
+// ---------------------------------------------------------------------------
+// HomeScreen — orchestrates the full driver trip lifecycle:
+//
+//   AvailabilityScreen (offline/available toggle)
+//     ↓ WebSocket delivers BookingOffer
+//   OfferScreen (30 s countdown — accept or decline)
+//     ↓ accept
+//   NavigationScreen (arrive → start → complete with GPS loop)
+//     ↓ complete
+//   AvailabilityScreen (driver set back to "available" by API)
+// ---------------------------------------------------------------------------
+
 export default function HomeScreen() {
   const router = useRouter();
+  const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
+
+  const { currentOffer, clearOffer } = useDriverOfferWebSocket();
+
+  // -------------------------------------------------------------------------
+  // Sign-out
+  // -------------------------------------------------------------------------
 
   async function handleSignOut() {
     try {
@@ -29,16 +67,72 @@ export default function HomeScreen() {
     ]);
   }
 
+  // -------------------------------------------------------------------------
+  // Offer accepted → transition to navigation
+  // -------------------------------------------------------------------------
+
+  function handleOfferAccepted(
+    tripId: string,
+    pickupLat: number,
+    pickupLng: number,
+    pickupAddress: string,
+  ) {
+    clearOffer();
+    setActiveTrip({ tripId, pickupLat, pickupLng, pickupAddress });
+  }
+
+  // -------------------------------------------------------------------------
+  // Trip complete → return to availability screen
+  // -------------------------------------------------------------------------
+
+  function handleTripComplete(_actualFare: string, _driverEarnings: string) {
+    setActiveTrip(null);
+  }
+
+  // -------------------------------------------------------------------------
+  // Render layers
+  // -------------------------------------------------------------------------
+
+  // Layer 3: Active navigation (overrides everything while on trip)
+  if (activeTrip) {
+    return (
+      <NavigationScreen
+        tripId={activeTrip.tripId}
+        pickupLat={activeTrip.pickupLat}
+        pickupLng={activeTrip.pickupLng}
+        pickupAddress={activeTrip.pickupAddress}
+        dropoffLat={activeTrip.dropoffLat}
+        dropoffLng={activeTrip.dropoffLng}
+        dropoffAddress={activeTrip.dropoffAddress}
+        onTripComplete={handleTripComplete}
+      />
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Driver Home</Text>
-      <Text style={styles.subtitle}>You are signed in.</Text>
-      <Pressable
-        style={styles.signOutBtn}
-        onPress={confirmSignOut}
-      >
-        <Text style={styles.signOutText}>Sign out</Text>
-      </Pressable>
+      {/* Layer 1: Availability toggle */}
+      <View style={styles.availabilityWrapper}>
+        <AvailabilityScreen />
+      </View>
+
+      {/* Layer 2: Offer overlay — shown when a dispatch offer arrives */}
+      {currentOffer && (
+        <View style={styles.offerOverlay}>
+          <OfferScreen
+            offer={currentOffer}
+            onAccepted={handleOfferAccepted}
+            onDeclined={clearOffer}
+          />
+        </View>
+      )}
+
+      {/* Sign-out link at the bottom */}
+      <View style={styles.footer}>
+        <Pressable onPress={confirmSignOut}>
+          <Text style={styles.signOutText}>Sign out</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -46,30 +140,25 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+  },
+  availabilityWrapper: {
+    flex: 1,
+  },
+  offerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
-    padding: 24,
-    backgroundColor: "#fff",
+    padding: 20,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#687076",
-    marginBottom: 40,
-  },
-  signOutBtn: {
-    backgroundColor: "#d9534f",
-    borderRadius: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
+  footer: {
+    alignItems: "center",
+    paddingVertical: 16,
+    backgroundColor: "#f5f5f5",
   },
   signOutText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
+    fontSize: 14,
+    color: "#d9534f",
+    fontWeight: "600",
   },
 });

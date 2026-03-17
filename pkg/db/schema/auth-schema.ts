@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
   pgTable,
+  pgEnum,
   text,
   bigint,
   timestamp,
@@ -10,6 +11,14 @@ import {
   varchar,
   uuid,
 } from "drizzle-orm/pg-core";
+
+// --- 004-driver-dispatch-trips additions ---
+export const availabilityStatusEnum = pgEnum("availability_status", [
+  "offline",
+  "available",
+  "on_trip",
+]);
+export type AvailabilityStatus = "offline" | "available" | "on_trip";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -28,6 +37,10 @@ export const user = pgTable("user", {
   isLocked: boolean("is_locked").notNull().default(false),
   lockedUntil: timestamp("locked_until"),
   lastLoginAt: timestamp("last_login_at"),
+  // --- 004-driver-dispatch-trips additions ---
+  availabilityStatus: availabilityStatusEnum("availability_status")
+    .default("offline")
+    .notNull(),
 });
 export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;

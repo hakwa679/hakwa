@@ -23,12 +23,12 @@ ORM, PostgreSQL, Redis pub/sub, WebSocket (`ws`), `@hakwa/workers`,
 
 **Purpose**: Schema changes before any service code is written
 
-- [ ] T001 Add `availabilityStatusEnum` (`'offline' | 'available' | 'on_trip'`)
+- [x] T001 Add `availabilityStatusEnum` (`'offline' | 'available' | 'on_trip'`)
       and `availabilityStatus` column to `user` table in
       `pkg/db/schema/auth-schema.ts`
-- [ ] T002 Add `driverId`, `acceptedAt`, `actualFare` columns to `trip` table in
+- [x] T002 Add `driverId`, `acceptedAt`, `actualFare` columns to `trip` table in
       `pkg/db/schema/trip.ts` (supplements spec 003 columns)
-- [ ] T003 Run `db-push` to apply schema and confirm `user.availabilityStatus`
+- [x] T003 Run `db-push` to apply schema and confirm `user.availabilityStatus`
       and all `trip` driver columns exist
 
 ---
@@ -40,25 +40,25 @@ before any route can function
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Implement `updateDriverLocation` in
+- [x] T004 Implement `updateDriverLocation` in
       `api/src/services/locationService.ts` — write to Redis hash
       `driver:{userId}:loc` (TTL 60 s); if driver has active trip, publish to
       `booking:{tripId}:location` pub/sub channel
-- [ ] T005 Implement `completeTrip` in `api/src/services/tripService.ts` —
+- [x] T005 Implement `completeTrip` in `api/src/services/tripService.ts` —
       single Drizzle transaction: update trip status to `completed`, compute
       `actualFare` from `actualDistanceKm`, insert two `ledgerEntry` rows
       (platform 7%, merchant 93%), insert gamification points entry
-- [ ] T006 [P] Implement `toggleAvailability`, `acceptBooking`,
+- [x] T006 [P] Implement `toggleAvailability`, `acceptBooking`,
       `declineBooking`, and `advanceTripStatus` in
       `api/src/services/driverService.ts`
-- [ ] T007 [P] Implement `acceptBooking` concurrency guard in `driverService.ts`
+- [x] T007 [P] Implement `acceptBooking` concurrency guard in `driverService.ts`
       — use conditional
       `UPDATE trip SET status='accepted', driverId=? WHERE id=? AND status='pending'`;
       throw `ConflictError` if zero rows updated
-- [ ] T008 Implement WebSocket offer delivery in `api/src/websocket.ts` —
+- [x] T008 Implement WebSocket offer delivery in `api/src/websocket.ts` —
       subscribe to `driver:{userId}:offer` Redis channel; push booking offer
       payload to connected driver client
-- [ ] T009 Register driver routes in `api/src/index.ts` by mounting
+- [x] T009 Register driver routes in `api/src/index.ts` by mounting
       `api/src/routes/driver.ts`
 
 **Checkpoint**: Foundation complete — location service, atomic accept, trip
@@ -75,19 +75,19 @@ booking offer with pickup details and fare.
 returns `204`; dispatch loop in spec 003 delivers offer to Redis
 `driver:{userId}:offer`; WebSocket pushes offer card to driver app.
 
-- [ ] T010 [US1] Implement `PATCH /api/driver/availability` in
+- [x] T010 [US1] Implement `PATCH /api/driver/availability` in
       `api/src/routes/driver.ts` — block `offline` transition when
       `status = 'on_trip'` (`409`); update `user.availabilityStatus`
-- [ ] T011 [US1] Implement `POST /api/driver/location` in
+- [x] T011 [US1] Implement `POST /api/driver/location` in
       `api/src/routes/driver.ts` — call `updateDriverLocation`, return `204`
-- [ ] T012 [P] [US1] Build `AvailabilityScreen.tsx` in
+- [x] T012 [P] [US1] Build `AvailabilityScreen.tsx` in
       `apps/mobile/driver/src/screens/AvailabilityScreen.tsx` — online/offline
       toggle with current status indicator, location permission request
-- [ ] T013 [US1] Implement `useDriverOfferWebSocket` hook in
+- [x] T013 [US1] Implement `useDriverOfferWebSocket` hook in
       `apps/mobile/driver/src/hooks/useDriverOfferWebSocket.ts` — connect to
       WebSocket, listen on `driver:{userId}:offer` channel, expose
       `currentOffer` state
-- [ ] T014 [US1] Build `OfferScreen.tsx` in
+- [x] T014 [US1] Build `OfferScreen.tsx` in
       `apps/mobile/driver/src/screens/OfferScreen.tsx` — booking offer card
       showing pickup address, estimated distance to pickup, fare estimate, and
       30-second countdown timer; auto-dismiss on expiry
@@ -107,22 +107,22 @@ trip to `accepted` and returns pickup details; second accept from another driver
 returns `409`; `PATCH /api/driver/bookings/:tripId/arrived` transitions to
 `driver_arrived`.
 
-- [ ] T015 [US2] Implement `POST /api/driver/bookings/:tripId/accept` in
+- [x] T015 [US2] Implement `POST /api/driver/bookings/:tripId/accept` in
       `api/src/routes/driver.ts` — call `acceptBooking` (conditional UPDATE),
       publish `accepted` status event to `booking:{tripId}:status`, notify
       passenger via `@hakwa/notifications`, return pickup details
-- [ ] T016 [US2] Implement `POST /api/driver/bookings/:tripId/decline` in
+- [x] T016 [US2] Implement `POST /api/driver/bookings/:tripId/decline` in
       `api/src/routes/driver.ts` — forward booking to next driver in dispatch
       loop (via Redis), return `204`
-- [ ] T017 [US2] Implement `PATCH /api/driver/bookings/:tripId/arrived` in
+- [x] T017 [US2] Implement `PATCH /api/driver/bookings/:tripId/arrived` in
       `api/src/routes/driver.ts` — transition to `driver_arrived` (conditional
       UPDATE WHERE `driverId = session.userId`), publish status event, notify
       passenger
-- [ ] T018 [P] [US2] Build `NavigationScreen.tsx` in
+- [x] T018 [P] [US2] Build `NavigationScreen.tsx` in
       `apps/mobile/driver/src/screens/NavigationScreen.tsx` — `@hakwa/map`
       component with driving directions to pickup; "I've Arrived" button; start
       background location updates every 5 s
-- [ ] T019 [US2] Start GPS location reporting loop on accept in
+- [x] T019 [US2] Start GPS location reporting loop on accept in
       `apps/mobile/driver/src/screens/NavigationScreen.tsx` — call
       `POST /api/driver/location` every 5 s while on trip; stop on trip
       completion or cancellation
@@ -142,17 +142,17 @@ triggering atomic fare split.
 `completed` and creates two `ledgerEntry` rows (platform 7%, merchant 93%) in
 the same transaction.
 
-- [ ] T020 [US3] Implement `PATCH /api/driver/bookings/:tripId/start` in
+- [x] T020 [US3] Implement `PATCH /api/driver/bookings/:tripId/start` in
       `api/src/routes/driver.ts` — transition to `in_progress` (conditional
       UPDATE WHERE `status='driver_arrived' AND driverId=?`), publish status
       event
-- [ ] T021 [US3] Implement `POST /api/driver/bookings/:tripId/complete` in
+- [x] T021 [US3] Implement `POST /api/driver/bookings/:tripId/complete` in
       `api/src/routes/driver.ts` — call `completeTrip` transaction service (trip
       status + ledger entries + gamification points + gamification event
       publish), publish `completed` status event, notify passenger
-- [ ] T022 [US3] Update `NavigationScreen.tsx` to show "Start trip" button on
+- [x] T022 [US3] Update `NavigationScreen.tsx` to show "Start trip" button on
       `driver_arrived` state and "Complete trip" button on `in_progress` state
-- [ ] T023 [US3] Show post-completion earnings summary in `NavigationScreen.tsx`
+- [x] T023 [US3] Show post-completion earnings summary in `NavigationScreen.tsx`
       — gross fare and net earnings (93%) — before returning to
       `AvailabilityScreen`
 
@@ -170,9 +170,9 @@ functional
 and driver `availabilityStatus` remains `available`; expired offer clears from
 `OfferScreen` and driver stays online.
 
-- [ ] T024 [US4] Confirm decline route in `api/src/routes/driver.ts` does not
+- [x] T024 [US4] Confirm decline route in `api/src/routes/driver.ts` does not
       change driver `availabilityStatus` (driver stays `available`)
-- [ ] T025 [US4] Implement offer expiry handling in `OfferScreen.tsx` — when
+- [x] T025 [US4] Implement offer expiry handling in `OfferScreen.tsx` — when
       countdown reaches 0, dismiss card and call
       `POST /api/driver/bookings/:tripId/decline` automatically; show brief
       "Request expired" toast
@@ -190,11 +190,11 @@ driver in available pool
 entries for the current driver with gross fare and net earnings;
 `EarningsScreen` renders the list.
 
-- [ ] T026 [US5] Implement `GET /api/driver/earnings` in
+- [x] T026 [US5] Implement `GET /api/driver/earnings` in
       `api/src/routes/driver.ts` — query `ledgerEntry` table for
       `holderType='driver'` rows belonging to the current user, join with `trip`
       for destination/date, paginate newest-first
-- [ ] T027 [P] [US5] Build `EarningsScreen.tsx` in
+- [x] T027 [P] [US5] Build `EarningsScreen.tsx` in
       `apps/mobile/driver/src/screens/EarningsScreen.tsx` — FlatList of trips
       with destination, date, gross fare, and net earnings (93% share); "Load
       more" pagination
@@ -205,15 +205,15 @@ entries for the current driver with gross fare and net earnings;
 
 ## Final Phase: Polish & Cross-Cutting Concerns
 
-- [ ] T028 [P] Validate concurrency: concurrent accept attempts on same `tripId`
+- [x] T028 [P] Validate concurrency: concurrent accept attempts on same `tripId`
       from two drivers — second must receive `409 ConflictError` — audit
       conditional UPDATE in `driverService.ts`
-- [ ] T029 [P] Validate driver cannot go offline when
+- [x] T029 [P] Validate driver cannot go offline when
       `availabilityStatus = 'on_trip'` — `PATCH /api/driver/availability` must
       return `409` in this state
-- [ ] T030 [P] Driver GPS location only published to `booking:{tripId}:location`
+- [x] T030 [P] Driver GPS location only published to `booking:{tripId}:location`
       when driver has an active trip — validate `locationService.ts` guard
-- [ ] T031 [P] Verify all driver routes return `403` for non-driver roles via
+- [x] T031 [P] Verify all driver routes return `403` for non-driver roles via
       `requireRole('driver')` middleware check
 
 ---

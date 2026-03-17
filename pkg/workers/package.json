@@ -6,6 +6,7 @@
         ".": "./src/index.ts"
     },
     "dependencies": {
+        "@hakwa/core": "*",
         "@hakwa/db": "*",
         "@hakwa/notifications": "*",
         "@hakwa/redis": "*"
