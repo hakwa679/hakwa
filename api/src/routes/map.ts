@@ -23,6 +23,10 @@ import { getZoneDetail } from "../services/mapZoneService.ts";
 
 export const mapRouter = Router();
 
+function readPathParam(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
 // Placeholder routes for spec 009 bootstrap.
 mapRouter.get("/health", (_req: Request, res: Response): void => {
   res.json({ service: "map", status: "ok" });
@@ -146,16 +150,21 @@ mapRouter.get(
         return;
       }
 
-      const items = await listPendingFeaturesInBbox({
+      const pendingQuery: {
+        minLat: number;
+        maxLat: number;
+        minLng: number;
+        maxLng: number;
+        featureType?: string;
+        maxAgeDays?: number;
+        sort: "oldest" | "newest" | "most_confirmed" | "most_disputed";
+        limit: number;
+        offset: number;
+      } = {
         minLat,
         maxLat,
         minLng,
         maxLng,
-        featureType,
-        maxAgeDays:
-          Number.isFinite(maxAgeDays) && maxAgeDays > 0
-            ? maxAgeDays
-            : undefined,
         sort: (sort ?? "newest") as
           | "oldest"
           | "newest"
@@ -163,7 +172,16 @@ mapRouter.get(
           | "most_disputed",
         limit,
         offset,
-      });
+      };
+
+      if (featureType) {
+        pendingQuery.featureType = featureType;
+      }
+      if (Number.isFinite(maxAgeDays) && maxAgeDays > 0) {
+        pendingQuery.maxAgeDays = maxAgeDays;
+      }
+
+      const items = await listPendingFeaturesInBbox(pendingQuery);
 
       res.json({ items, total: items.length });
     } catch (error) {
@@ -189,11 +207,16 @@ mapRouter.post(
         disputeCategory?: string;
       };
 
-      const result = await verifyMapFeature(
-        session.user.id,
-        req.params.id,
-        body,
-      );
+      const featureId = readPathParam(req.params.id);
+      if (!featureId) {
+        res.status(422).json({
+          code: "MAP_INVALID_FEATURE_ID",
+          message: "Feature id is required.",
+        });
+        return;
+      }
+
+      const result = await verifyMapFeature(session.user.id, featureId, body);
       res.status(201).json(result);
     } catch (error) {
       if (error instanceof Error) {
@@ -265,11 +288,16 @@ mapRouter.post(
       }
 
       const body = req.body as { reason: string; note?: string };
-      const result = await reportMapFeature(
-        session.user.id,
-        req.params.id,
-        body,
-      );
+      const featureId = readPathParam(req.params.id);
+      if (!featureId) {
+        res.status(422).json({
+          code: "MAP_INVALID_FEATURE_ID",
+          message: "Feature id is required.",
+        });
+        return;
+      }
+
+      const result = await reportMapFeature(session.user.id, featureId, body);
       res.status(201).json(result);
     } catch (error) {
       if (error instanceof Error) {
@@ -401,14 +429,12 @@ mapRouter.get(
         return;
       }
 
-      const zoneId = req.params["zoneId"];
+      const zoneId = readPathParam(req.params["zoneId"]);
       if (!zoneId) {
-        res
-          .status(422)
-          .json({
-            code: "MAP_INVALID_ZONE_ID",
-            message: "zoneId is required.",
-          });
+        res.status(422).json({
+          code: "MAP_INVALID_ZONE_ID",
+          message: "zoneId is required.",
+        });
         return;
       }
 

@@ -4,306 +4,355 @@ description: "Task list for Gamified Review & Rating System"
 
 # Tasks: Gamified Review & Rating System
 
-**Feature Branch**: `011-gamified-review-rating` **Input**: plan.md, spec.md,
-data-model.md **Tech Stack**: TypeScript 5.x, Drizzle ORM, PostgreSQL, Redis
-(pub/sub `review:revealed:{userId}`, cache `reputation:{userId}`),
-`@hakwa/workers`, `@hakwa/notifications`, `gamification:events` Redis Stream
+**Input**: Design documents from `specs/011-gamified-review-rating/`  
+**Prerequisites**: `plan.md` (required), `spec.md` (required), `research.md`,
+`data-model.md`, `contracts/rest-api.md`
 
----
+**Tests**: Included because spec success criteria explicitly require automated
+validation.
 
 ## Format: `[ID] [P?] [Story] Description`
 
-- **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Which user story this task belongs to (US1–US9)
-- All paths relative to repo root
+- **[P]**: Can run in parallel (different files, no blocking dependency)
+- **[Story]**: User story label (`[US1]` ... `[US11]`) for story-phase tasks
+- Each task includes an explicit file path
 
 ---
 
-## Phase 1: Setup (Schema + Seed Data)
+## Phase 1: Setup (Schema + Contract Baseline)
 
-**Purpose**: Define all review tables, add `trip.completedAt`, add idempotency
-constraint to `pointsLedger`, and seed tags before any review endpoint is built
+**Purpose**: Establish schema, constraints, and seeds required by all stories.
 
-- [ ] T001 Define `reviewTag` table (id, key varchar(60) UNIQUE, label
-      varchar(80), icon varchar(10), direction
-      `passenger_to_driver|driver_to_passenger|both`, sortOrder smallint
-      default 0) in `pkg/db/schema/review.ts`
-- [ ] T002 Define `tripReview` table (id, tripId FK→trip SET NULL,
-      reviewerUserId FK→user SET NULL, revieweeUserId FK→user SET NULL,
-      direction `passenger_to_driver|driver_to_passenger`, rating smallint CHECK
-      1–5, comment text nullable, pointsAwarded integer default 0, submittedAt)
-      with `UNIQUE(tripId, direction)` and indexes on `reviewerUserId`,
-      `revieweeUserId`, `tripId`, `submittedAt` in `pkg/db/schema/review.ts`
-- [ ] T003 [P] Define `tripReviewTag` join table (id, reviewId FK→tripReview
-      CASCADE, tagId FK→reviewTag CASCADE) with `UNIQUE(reviewId, tagId)` in
-      `pkg/db/schema/review.ts`
-- [ ] T004 [P] Add `completedAt` timestamp column to `trip` table in
-      `pkg/db/schema/trip.ts` (additive — nullable to preserve existing rows);
-      ensure `tripService.ts` sets `completedAt = now()` at completion
-- [ ] T005 [P] Add `UNIQUE(accountId, sourceAction, referenceId)` constraint to
-      `pointsLedger` in `pkg/db/schema/gamification.ts` for idempotency guard;
-      `referenceId` column added if not present
-- [ ] T006 Export review entities from `pkg/db/schema/index.ts`; run `db-push`
-      to apply schema changes
-- [ ] T007 Implement `api/src/jobs/seedReviewTags.ts` —
-      `INSERT INTO reviewTag ... ON CONFLICT (key) DO NOTHING` for all 15 tag
-      rows from data-model; run as startup job in `api/src/index.ts`
+- [x] T001 Add `completedAt` column to `trip` schema and completion write-path
+      in `pkg/db/schema/trip.ts` and `api/src/services/tripService.ts`
+- [x] T002 [P] Create review tables (`reviewTag`, `tripReview`, `tripReviewTag`)
+      with indexes and constraints in `pkg/db/schema/review.ts`
+- [x] T003 [P] Add points idempotency constraint
+      `UNIQUE(accountId, sourceAction, referenceId)` in
+      `pkg/db/schema/gamification.ts`
+- [x] T004 Export review schema from `pkg/db/schema/index.ts` and run schema
+      apply workflow via `pkg/db/package.json` scripts
+- [x] T005 [P] Implement and wire review tag seeding job in
+      `api/src/jobs/seedReviewTags.ts` and `api/src/index.ts`
+- [x] T006 Align shared request/response and enum contracts for reviews in
+      `types/src/` and `types/index.ts`
+- [x] T062 [P] Initialize/confirm shared mobile review module scaffold in
+      `pkg/ui-native/src/review/` and export entrypoints from
+      `pkg/ui-native/src/index.ts` for reuse across rider/driver apps
 
 ---
 
-## Phase 2: Foundational (Review Service + Points Logic)
+## Phase 2: Foundational (Core Review + Reveal + Points)
 
-**Purpose**: Core `submitReview` service function with atomic points award must
-exist before any route can accept submissions
+**Purpose**: Build blocking service layer used by every user story.
 
-**⚠️ CRITICAL**: All user stories from US1 onward depend on this service being
-correct
+**CRITICAL**: No user-story work starts before this phase is complete.
 
-- [ ] T008 Implement `isRevealed(review, trip, counterpartExists)` helper in
-      `api/src/services/reviewService.ts` — pure function: returns true if
-      `(counterpartReview exists) OR (now() > trip.completedAt + reviewerWindowDuration)`
-      where passenger window = 72 h, driver window = 24 h
-- [ ] T009 Implement `calculateReviewPoints(rating, tagCount, hasComment)`
-      utility in `api/src/services/reviewService.ts` — `basePoints = 10`;
-      `tagBonus = tagCount >= 2 ? 5 : 0`; `commentBonus = hasComment ? 10 : 0`;
-      return `basePoints + tagBonus + commentBonus`
-- [ ] T010 Implement `submitReview(userId, tripId, payload)` in
-      `api/src/services/reviewService.ts`: (1) verify trip `status = completed`
-      and caller is passenger or driver on this trip, (2) check window not
-      expired (else `REVIEW_WINDOW_CLOSED`), (3) validate tag keys against
-      `reviewTag.direction`, (4) compute `pointsAwarded`, (5) begin transaction:
-      `INSERT tripReview ON CONFLICT (tripId, direction) DO NOTHING` — if
-      rowCount = 0 return 409 `REVIEW_ALREADY_SUBMITTED`; bulk-insert
-      `tripReviewTag` rows; `UPDATE pointsAccount.totalPoints += pointsAwarded`;
-      `INSERT pointsLedger (sourceAction = 'review_submitted', referenceId = tripReviewId) ON CONFLICT DO NOTHING`;
-      (6) post-commit: `XADD gamification:events` event
-      `{ type: 'review_submitted', userId, reviewId, tagCount, hasComment }` for
-      badge evaluation; check if double-blind lifts and publish
-      `review:revealed:{revieweeUserId}` if so
+- [x] T007 Implement points calculator (`10/15/25`) and comment/tag
+      normalization helpers in `api/src/services/reviewService.ts`
+- [x] T008 [P] Implement double-blind reveal evaluator (computed-at-read, no
+      persisted flag) in `api/src/services/reviewService.ts`
+- [x] T009 [P] Implement direction/window validation (72h passenger, 24h driver)
+      in `api/src/services/reviewService.ts`
+- [x] T010 Implement transactional `submitReview` flow with idempotent ledger
+      write and review-tag inserts in `api/src/services/reviewService.ts`
+- [x] T011 [P] Publish post-commit gamification and reveal events
+      (`gamification:events`, `review:revealed:{userId}`) in
+      `api/src/services/reviewService.ts`
+- [x] T012 Register review error codes/envelopes in `errors/src/` and
+      `errors/index.ts`
 
-**Checkpoint**: Core review logic with atomic points and idempotency guard is
-complete
+**Checkpoint**: Core review submission, points, and reveal logic are stable.
 
 ---
 
-## Phase 3: User Story 1 + 2 — Passenger Reviews Driver & Driver Reviews Passenger (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - Passenger reviews driver (Priority: P1) 🎯 MVP
 
-**Goal**: Both review directions are accepted via
-`POST /api/reviews/trips/:tripId`; correct window enforced; `trip_review`
-created; points awarded; celebration animation plays.
+**Goal**: Passenger can submit post-trip review and receive immediate reward
+feedback.
 
-**Independent Test**: Passenger submits rating-only review → `trip_review` row
-with `direction = passenger_to_driver`, `pointsAwarded = 10`; driver submits
-5-star + 2-tag review → `pointsAwarded = 15`; duplicate submit → 409.
+**Independent Test**: Completed trip for passenger shows review card and
+successful submit creates one `tripReview` row plus one `pointsLedger` entry.
 
-- [ ] T011 [US1] [US2] Implement `POST /api/reviews/trips/:tripId` in
-      `api/src/routes/reviews.ts` — require session; call `submitReview`; return
-      `{ reviewId, pointsAwarded, directionContext }` for celebration animation
-- [ ] T012 [P] [US1] [US2] Implement `GET /api/reviews/tags` in
-      `api/src/routes/reviews.ts` — return all `reviewTag` rows; filter by
-      `direction` query param (`passenger_to_driver` or `driver_to_passenger` or
-      `both`) so mobile only receives relevant chips
-- [ ] T013 [P] [US1] [US2] Build `ReviewCard.tsx` in
-      `apps/mobile/rider/src/screens/TripComplete/ReviewCard.tsx` — three-step
-      flow: Step 1 star row (tap → advance), Step 2 tag chips (loaded from
-      `GET /api/reviews/tags?direction=passenger_to_driver`), Step 3 comment
-      field (280 char limit, live counter) + Submit button; live points preview
-      updating at each step; "Skip" link on Step 1 (dismisses and schedules
-      reminder push in 6 h)
-- [ ] T014 [P] [US1] [US2] Build mirror `ReviewCard.tsx` in
-      `apps/mobile/driver/src/screens/TripComplete/ReviewCard.tsx` — same
-      three-step flow with `direction = driver_to_passenger` tags; 24-hour
-      window label
-
-**Checkpoint**: User Story 1 + 2 complete — both review directions are
-functional with correct points
+- [x] T013 [P] [US1] Add contract test for passenger review submission in
+      `api/tests/contract/reviews.passenger-submit.contract.test.ts`
+- [x] T014 [P] [US1] Add integration test for passenger review flow in
+      `api/tests/integration/reviews.passenger-submit.integration.test.ts`
+- [x] T015 [US1] Implement passenger review submit route handler in
+      `api/src/routes/reviews.ts` for `POST /reviews` (contract-aligned)
+- [x] T061 [US1] Extract shared review-flow logic (step state, points preview,
+      validation) into a reusable mobile module in `pkg/ui-native/src/review/`
+      before mirroring rider/driver screens
+- [x] T016 [P] [US1] Implement rider review card screen flow in
+      `apps/mobile/rider/src/screens/TripComplete/ReviewCard.tsx`
+- [x] T017 [US1] Implement rider celebration and points feedback UI state in
+      `apps/mobile/rider/src/screens/TripComplete/ReviewCard.tsx`
 
 ---
 
-## Phase 4: User Story 3 + 4 — Three-Step Flow + Points Calculation (Priority: P1)
+## Phase 4: User Story 2 - Driver reviews passenger (Priority: P1)
 
-**Goal**: Live points preview updates correctly at each step; `pointsAwarded`
-stored on `trip_review` matches preview; 280-char input guard.
+**Goal**: Driver can submit passenger review within driver window.
 
-**Independent Test**: ReviewCard shows "10 pts" after star, "15 pts" after 2+
-tags, "25 pts" after comment; `pointsAwarded` on `trip_review` matches those
-exact values.
+**Independent Test**: Driver can submit `driver_to_passenger` review and award
+path uses same transactional rules.
 
-- [ ] T015 [US3] [US4] Implement
-      `calculatePreviewPoints(step, selectedTagCount, hasComment)` selector in
-      `apps/mobile/rider/src/screens/TripComplete/ReviewCard.tsx` — exported so
-      unit-testable; ensure `pointsAwarded` sent in POST body matches
-      server-computed value (server is authoritative; client is optimistic
-      display only)
-- [ ] T016 [P] [US3] Implement step-advance logic in `ReviewCard.tsx` — tapping
-      any star auto-advances to Step 2 without "Next" tap; "Skip" on Step 2
-      advances to Step 3 with empty tags; character count warning disables
-      submit when comment > 280
-
-**Checkpoint**: User Story 3 + 4 complete — stepwise UX flow and points schedule
-are correct on both client and server
+- [x] T018 [P] [US2] Add contract test for driver review submission in
+      `api/tests/contract/reviews.driver-submit.contract.test.ts`
+- [x] T019 [P] [US2] Add integration test for driver review flow in
+      `api/tests/integration/reviews.driver-submit.integration.test.ts`
+- [x] T020 [US2] Implement driver review submit path in
+      `api/src/routes/reviews.ts` for `POST /reviews` driver direction
+- [x] T021 [P] [US2] Implement driver review card screen flow in
+      `apps/mobile/driver/src/screens/TripComplete/ReviewCard.tsx`
 
 ---
 
-## Phase 5: User Story 5 — Double-Blind Reveal (Priority: P1)
+## Phase 5: User Story 3 - Stepwise review flow (Priority: P1)
 
-**Goal**: `GET /api/reviews/trips/:tripId` filters reviews using `isRevealed()`
-logic; reviews become visible when counterpart submits or window expires;
-WebSocket event fires on reveal.
+**Goal**: Three-step UX (stars -> tags -> comment) with live progression.
 
-**Independent Test**: Passenger submits review; driver fetches trip reviews →
-empty (window open, no driver review); driver submits → both reviews returned;
-WebSocket `review.revealed` event emitted to both parties.
+**Independent Test**: Step transition and validation rules operate without
+server changes.
 
-- [ ] T017 [US5] Implement `GET /api/reviews/trips/:tripId` in
-      `api/src/routes/reviews.ts` — require session; load both `tripReview` rows
-      for trip (and their tags); for each review call
-      `isRevealed(review, trip, counterpartExists)` from caller's perspective;
-      only return reviews where `isRevealed = true`
-- [ ] T018 [P] [US5] Subscribe to `review:revealed:{userId}` Redis pub/sub in
-      `api/src/websocket.ts` — push `review.revealed` event (`{ tripId }`) to
-      user's WebSocket connection
-- [ ] T019 [P] [US5] Handle `review.revealed` event in both mobile apps — show
-      "Your review is now visible" in-app notification with link to trip review
-      screen
-
-**Checkpoint**: User Story 5 complete — double-blind reveal logic is implemented
-and tested
+- [x] T022 [P] [US3] Add UI test for step advancement and validation rules in
+      `apps/mobile/rider/src/screens/TripComplete/ReviewCard.test.tsx`
+- [x] T023 [P] [US3] Implement tag loading/filtering endpoint for step 2 in
+      `api/src/routes/reviews.ts` for `GET /reviews/tags`
+- [x] T024 [US3] Implement live step and input constraints in rider review card
+      in `apps/mobile/rider/src/screens/TripComplete/ReviewCard.tsx`
+- [x] T025 [US3] Mirror step constraints in driver review card in
+      `apps/mobile/driver/src/screens/TripComplete/ReviewCard.tsx`
 
 ---
 
-## Phase 6: User Story 6 — Reviewer Badges (Priority: P2)
+## Phase 6: User Story 4 - Points & bonus calculation (Priority: P1)
 
-**Goal**: 5 reviewer badges (first_review, tagged_reviewer, dedicated_reviewer,
-veteran_reviewer, perfect_streak_reviewer) awarded via gamification worker after
-`review_submitted` event; idempotent.
+**Goal**: Persisted `pointsAwarded` exactly matches visible point schedule.
 
-**Independent Test**: `review_submitted` gamification event with `userId` →
-badge worker evaluates reviewer counts from `tripReview` table → awards
-`first_review` on first submission; all badge awards idempotent
-(`INSERT INTO userBadge ON CONFLICT DO NOTHING`).
+**Independent Test**: Automated cases validate 10/15/25 outcomes and edge cases.
 
-- [ ] T020 [US6] Seed reviewer and reputation badge rows into `badge` table:
-      `first_review`, `tagged_reviewer` (5 tagged reviews), `dedicated_reviewer`
-      (25 reviews), `veteran_reviewer` (100 reviews), `perfect_streak_reviewer`
-      (7 consecutive reviewed trips), `top_rated_driver` (avg ≥ 4.8, 50+
-      reviews), `consistent_driver` (50+ reviews, zero 1-star), plus any
-      additional reputation badges
-- [ ] T021 [US6] Extend `evaluateBadges` in
-      `pkg/workers/src/workers/gamificationProcessor.ts` to handle
-      `review_submitted` events — query `tripReview` counts by `reviewerUserId`;
-      evaluate all reviewer badge conditions; award idempotently
-
-**Checkpoint**: User Story 6 complete — reviewer badges awarded correctly via
-existing gamification worker
+- [x] T026 [P] [US4] Add unit tests for points calculator and normalization in
+      `api/tests/unit/reviews.points.unit.test.ts`
+- [x] T027 [P] [US4] Add integration tests for points+ledger atomicity in
+      `api/tests/integration/reviews.points.integration.test.ts`
+- [x] T028 [US4] Expose points breakdown in submit response contract in
+      `api/src/routes/reviews.ts` and `types/src/`
 
 ---
 
-## Phase 7: User Story 7 — Reputation Display on Profiles (Priority: P2)
+## Phase 7: User Story 5 - Double-blind reveal (Priority: P1)
 
-**Goal**: `GET /api/users/:id/reputation` returns avg rating, top tags, comment
-snippets; only includes revealed reviews; result cached in Redis; passenger
-rating shown on booking dispatch.
+**Goal**: Review visibility follows counterpart-submit or counterpart-expiry
+rules.
 
-**Independent Test**: 30 revealed reviews for a driver →
-`GET /api/users/:id/reputation` returns avg, top-3 tags, 5 comments; unrevealed
-reviews excluded; Redis TTL cache `reputation:{userId}` of 5 min.
+**Independent Test**: Hidden review remains omitted until reveal condition is
+met; reveal event triggers updates.
 
-- [ ] T022 [US7] Implement `getUserReputation(userId, callerRole)` in
-      `api/src/services/reviewService.ts` — check Redis `reputation:{userId}`
-      cache (TTL 5 min); on miss: aggregate revealed `tripReview` rows by
-      `revieweeUserId`; compute `AVG(rating)`, count per star, top-5 cited tags
-      (count descending), last 5 comments (anonymous — "A passenger"); write to
-      cache; return
-- [ ] T023 [P] [US7] Implement `GET /api/users/:id/reputation` in
-      `api/src/routes/reviews.ts` — require session; calls `getUserReputation`;
-      driver-only fields gated by reviewee `role = driver`
-- [ ] T024 [P] [US7] Invalidate Redis `reputation:{userId}` cache in
-      `submitReview` after reveal condition fires in `reviewService.ts` — use
-      `redis.del('reputation:{userId}')`
-- [ ] T025 [P] [US7] Include `passengerRating` (avg + count from revealed
-      reviews) in booking request dispatch payload in
-      `api/src/services/bookingService.ts` — show "New rider" if fewer than 3
-      revealed reviews
-
-**Checkpoint**: User Story 7 complete — reputation scores available on profiles
-and booking dispatch
+- [x] T029 [P] [US5] Add contract tests for reveal filtering in
+      `api/tests/contract/reviews.reveal.contract.test.ts`
+- [x] T030 [P] [US5] Add integration tests for counterpart submit/expiry
+      scenarios in `api/tests/integration/reviews.reveal.integration.test.ts`
+- [x] T031 [US5] Implement trip-review read endpoint with computed reveal
+      filtering in `api/src/routes/reviews.ts` for `GET /reviews/trip/:tripId`
+- [x] T032 [P] [US5] Wire `review:revealed` fan-out in websocket layer in
+      `api/src/websocket.ts`
+- [x] T033 [US5] Handle reveal update event in rider and driver apps in
+      `apps/mobile/rider/src/` and `apps/mobile/driver/src/`
 
 ---
 
-## Phase 8: User Story 8 + 9 — Driver Reputation Dashboard + Reputation Badges (Priority: P2)
+## Phase 8: User Story 6 - Reviewer badges (Priority: P2)
 
-**Goal**: Driver reputation screen shows monthly chart, tag annotations,
-actionable feedback; reputation badges awarded post-review via gamification
-worker.
+**Goal**: Reviewer achievement badges are awarded idempotently after review
+submission.
 
-**Independent Test**: Driver with 5 `late_arrival` tags in last 30 days →
-reputation dashboard returns annotation; `top_rated_driver` badge check
-evaluates `AVG(rating)` over 50+ reviews.
+**Independent Test**: Badge conditions evaluate from review history and never
+duplicate grants.
 
-- [ ] T026 [US8] Implement `GET /api/reviews/me/reputation-dashboard` in
-      `api/src/routes/reviews.ts` — driver session required; monthly avg rating
-      going back 6 months (GROUP BY month on `submittedAt`); top-cited negative
-      tags (for annotation); top-cited positive tags; badge list with award
-      dates
-- [ ] T027 [P] [US8] Implement `buildAnnotations(negativeTags)` in
-      `reviewService.ts` — for each tag with count ≥ 5 in last 30 days, build
-      actionable annotation text (e.g. "5 recent passengers mentioned 'Late
-      arrival'")
-- [ ] T028 [P] [US9] Extend `evaluateBadges` in `gamificationProcessor.ts` for
-      reputation badges — evaluate `top_rated_driver` (avg ≥ 4.8 over 50+
-      revealed reviews), `consistent_driver` (50+ reviews, zero 1-star) after
-      each `review_submitted` event against reviewee's stats
-
-**Checkpoint**: User Story 8 + 9 complete — driver reputation dashboard and
-reputation badge awards are functional
+- [x] T034 [P] [US6] Add badge seed entries for reviewer achievements in
+      `pkg/db/seeds/` and `pkg/db/schema/gamification.ts`
+- [x] T035 [P] [US6] Add worker tests for reviewer badge triggers in
+      `pkg/workers/src/__tests__/reviewerBadges.test.ts`
+- [x] T036 [US6] Implement reviewer badge evaluation in
+      `pkg/workers/src/workers/gamificationProcessor.ts`
 
 ---
 
-## Final Phase: Polish & Cross-Cutting Concerns
+## Phase 9: User Story 7 - Reputation display on profiles (Priority: P2)
 
-- [ ] T029 [P] Error codes: register `REVIEW_ALREADY_SUBMITTED`,
-      `REVIEW_WINDOW_CLOSED`, `REVIEW_INVALID_TAG`, `REVIEW_INVALID_DIRECTION`
-      in `@hakwa/errors`
-- [ ] T030 [P] Schedule reminder push notification 6 hours after trip completion
-      for passengers who skipped review — use `node-cron` daily check or Redis
-      key with TTL in `api/src/jobs/reviewReminder.ts`
-- [ ] T031 [P] Ensure `tripService.ts` sets `trip.completedAt = now()` when
-      status transitions to `completed` (required for window expiry
-      calculations)
+**Goal**: Profile reputation aggregates show revealed-only review insights.
+
+**Independent Test**: Driver and passenger profile payloads show correct
+aggregates and fallback behavior.
+
+- [x] T037 [P] [US7] Add contract tests for reputation payloads in
+      `api/tests/contract/reviews.reputation.contract.test.ts`
+- [x] T038 [P] [US7] Implement reputation aggregate query and Redis cache in
+      `api/src/services/reviewService.ts`
+- [x] T039 [US7] Implement public reputation route in
+      `api/src/routes/reviews.ts` for `GET /reviews/user/:userId`
+- [x] T063 [US7] Implement authenticated self-reputation route in
+      `api/src/routes/reviews.ts` for `GET /reviews/me`
+- [x] T040 [P] [US7] Invalidate `reputation:{userId}` cache on new reveal in
+      `api/src/services/reviewService.ts`
+- [x] T064 [US7] Implement passenger signal route in `api/src/routes/reviews.ts`
+      for `GET /reviews/passenger-signal/:userId`
+- [x] T041 [US7] Add passenger rating signal in booking request payload in
+      `api/src/services/bookingService.ts` using
+      `GET /reviews/passenger-signal/:userId`
+- [x] T065 [US7] Implement driver signal route in `api/src/routes/reviews.ts`
+      for `GET /reviews/driver-signal/:userId`
+- [x] T042 [US7] Add driver rating signal in rider matching payload in
+      `api/src/services/matchingService.ts` and document/implement
+      `GET /reviews/driver-signal/:userId` contract
+
+---
+
+## Phase 10: User Story 8 - Driver reputation dashboard (Priority: P2)
+
+**Goal**: Driver-specific dashboard includes history, tag insights, and
+annotations.
+
+**Independent Test**: Dashboard shows 6-month series, top tags, and negative-tag
+annotations.
+
+- [x] T043 [P] [US8] Add contract tests for dashboard payload in
+      `api/tests/contract/reviews.dashboard.contract.test.ts`
+- [x] T044 [P] [US8] Implement dashboard aggregates in review service in
+      `api/src/services/reviewService.ts`
+- [x] T045 [US8] Implement driver dashboard route in `api/src/routes/reviews.ts`
+      for `GET /reviews/me/dashboard`
+- [x] T046 [US8] Add annotation builder for negative tag patterns in
+      `api/src/services/reviewService.ts`
+
+---
+
+## Phase 11: User Story 9 - Reputation badges (Priority: P2)
+
+**Goal**: Reputation badges award and revoke based on visible-review metrics.
+
+**Independent Test**: Crossing thresholds grants badges; dropping below
+thresholds revokes them.
+
+- [x] T047 [P] [US9] Add worker tests for reputation badge award/revoke in
+      `pkg/workers/src/__tests__/reputationBadges.test.ts`
+- [x] T048 [US9] Implement reputation badge evaluation/revocation in
+      `pkg/workers/src/workers/gamificationProcessor.ts`
+- [x] T049 [US9] Add revocation notification event emission in
+      `pkg/workers/src/workers/gamificationProcessor.ts`
+
+---
+
+## Phase 12: User Story 10 - Weekly review mission (Priority: P3)
+
+**Goal**: Weekly mission tracks review count and awards one-time weekly bonus.
+
+**Independent Test**: Third review in week grants exactly one 50-point bonus;
+week rollover resets mission.
+
+- [x] T050 [P] [US10] Add mission-progress tests and idempotency cases in
+      `pkg/workers/src/__tests__/weeklyReviewMission.test.ts`
+- [x] T051 [US10] Implement mission progress tracking and bonus award in
+      `pkg/workers/src/workers/gamificationProcessor.ts`
+- [x] T052 [P] [US10] Implement Monday 00:00 FJT reset job in
+      `api/src/jobs/weeklyReviewMissionReset.ts`
+
+---
+
+## Phase 13: User Story 11 - Review reminder notification (Priority: P3)
+
+**Goal**: Pending reviewers receive reminder notifications 6h before window
+close.
+
+**Independent Test**: Eligible pending review creates notification record and
+dispatch event; submitted/expired cases are skipped.
+
+- [x] T053 [P] [US11] Add scheduler tests for eligible/ineligible reminder cases
+      in `api/tests/integration/reviews.reminder.integration.test.ts`
+- [x] T054 [US11] Implement reminder scheduling job writing pending notification
+      records in `api/src/jobs/reviewReminder.ts`
+- [x] T055 [P] [US11] Publish `notification.dispatch` events for reminders in
+      `api/src/jobs/reviewReminder.ts`
+- [x] T056 [US11] Add reminder dispatch handling via notifications package
+      pipeline in `pkg/notifications/src/`
+- [x] T057 [US11] Implement deep-link handling and stale-link fallback UX in
+      `apps/mobile/rider/src/` and `apps/mobile/driver/src/`
+
+---
+
+## Phase 14: Polish & Cross-Cutting Concerns
+
+- [x] T058 [P] Add end-to-end regression test covering bidirectional review +
+      reveal + reminders in `api/tests/e2e/reviews.e2e.test.ts`
+- [x] T059 [P] Add telemetry for SC-001 conversion and SC-002 latency in
+      `api/src/services/reviewService.ts` and `apps/mobile/*/src/`
+- [x] T060 [P] Update runbook and feature docs in `docs/runbooks/` and
+      `specs/011-gamified-review-rating/quickstart.md`
 
 ---
 
 ## Dependencies
 
+```text
+Phase 1 -> Phase 2 -> Phases 3-13 -> Phase 14
+
+US1 depends on Phase 2
+US2 depends on Phase 2
+US3 depends on US1/US2 UI baseline and Phase 2 service APIs
+US4 depends on Phase 2 points logic
+US5 depends on Phase 2 and active review submissions from US1/US2
+US6 depends on Phase 2 event publication
+US7 depends on US5 reveal logic
+US8 depends on US7 aggregates
+US9 depends on US7 aggregates and US6 worker flow
+US10 depends on US6 worker/event infrastructure
+US11 depends on notification infrastructure and review window logic from Phase 2
 ```
-Phase 1 (Schema + Seed) → Phase 2 (submitReview service) → Phase 3 (US1+US2 routes)
-US3+US4 (points flow) depends on Phase 2 service being correct
-US5 (double-blind) depends on Phase 3 (reviews must exist to be revealed)
-US6 (reviewer badges) depends on Phase 3 (review_submitted gamification event)
-US7 (reputation display) depends on Phase 3 (revealed reviews must exist)
-US8 (reputation dashboard) depends on US7 (reputation aggregate exists)
-US9 (reputation badges) depends on US7 (avg rating computable)
-```
+
+---
 
 ## Parallel Execution Examples
 
-- T003 + T004 + T005 can run in parallel (separate schema changes)
-- T011 + T012 can run in parallel (POST endpoint vs GET tags endpoint)
-- T013 + T014 can run in parallel (rider ReviewCard vs driver ReviewCard)
-- T022 + T023 + T024 + T025 can run in parallel (cache, endpoint, invalidation,
-  booking dispatch)
-- T027 + T028 can run in parallel (annotations vs reputation badge evaluation)
+- T002, T003, T005, T006, T062 can run in parallel after T001 starts
+- T008, T009, T011, T012 can run in parallel after T007 starts
+- T013 and T014 can run in parallel; T061 should complete before T016/T021
+- T037, T038, T040 can run in parallel before route completion T039
+- T053, T055, T056, T057 can run in parallel once reminder scheduler model is
+  defined
+
+---
 
 ## Implementation Strategy
 
-- **MVP**: Phase 1 + Phase 2 + Phase 3 (T001–T014) — both review directions with
-  points and celebration UI
-- **MVP+**: Add Phase 4 + Phase 5 (T015–T019) — live points preview +
-  double-blind reveal
-- **Full P2**: Add Phase 6 + Phase 7 (T020–T025) — reviewer badges + reputation
-  display
-- **Complete**: Add Phase 8 + Polish (T026–T031) — driver dashboard + reputation
-  badges
+### MVP First (P1 only)
 
-**Total tasks**: 31 | **Parallelizable**: 13 | **User stories**: 9
+1. Complete Phase 1 and Phase 2
+2. Deliver US1 and US2
+3. Add US3, US4, US5
+4. Validate P1 acceptance and release MVP
+
+### Incremental Delivery
+
+1. P1 release (US1-US5)
+2. P2 release (US6-US9)
+3. P3 release (US10-US11)
+4. Final hardening and observability (Phase 14)
+
+### Team Parallelization
+
+1. Schema + foundation squad: Phases 1-2
+2. Mobile squad: US1-US3 + US11 deep-link UX
+3. API squad: US4-US5 + US7-US8
+4. Worker/gamification squad: US6, US9, US10
+5. QA/ops squad: Phase 14 validation and metrics
+
+---
+
+## Notes
+
+- Story tasks are isolated by `[US#]` to support independent
+  implementation/testing.
+- [P] tasks target separate files or independent components.
+- Keep route contracts and shared types synchronized with `@hakwa/types` before
+  integration.

@@ -36,6 +36,10 @@ import { startSafetyCheckInEscalationWorker } from "./workers/checkInEscalation.
 import { validateSafetyEnvironment } from "./config/env.ts";
 import { registerTripShareExpiryCron } from "./jobs/tripShareExpiry.ts";
 import { requestLogger } from "./middleware/requestLogger.ts";
+import { reviewsRouter } from "./routes/reviews.ts";
+import { seedReviewTags } from "./jobs/seedReviewTags.ts";
+import { registerReviewReminderCron } from "./jobs/reviewReminder.ts";
+import { registerWeeklyReviewMissionResetCron } from "./jobs/weeklyReviewMissionReset.ts";
 
 const server = express();
 const httpServer = createServer(server);
@@ -69,6 +73,7 @@ server.use("/api/v1/map/uploads", mapUploadsRouter);
 server.use("/api/v1/admin/map", adminMapRouter);
 server.use("/api/v1/safety", safetyRouter);
 server.use("/api/v1/admin/safety", adminSafetyRouter);
+server.use("/api/v1/reviews", reviewsRouter);
 
 // WebSocket
 attachWebSocketServer(httpServer);
@@ -119,6 +124,16 @@ startGamificationConsumer().catch((err: unknown) => {
 startSafetySmsSender();
 startSafetyCheckInEscalationWorker();
 
+seedReviewTags()
+  .then((count) => {
+    if (count > 0) {
+      console.info("[seed] review tags inserted", { count });
+    }
+  })
+  .catch((err: unknown) => {
+    console.error("[seed] review tags failed", { err });
+  });
+
 // Re-engagement cron — daily at 09:00 Fiji time (UTC+12 → 21:00 UTC previous day)
 cron.schedule("0 21 * * *", () => {
   runReEngagementJob().catch((err: unknown) => {
@@ -130,6 +145,8 @@ registerWeeklyPayoutCron();
 registerMapWeeklyMissionCron();
 registerMapLeaderboardRolloverCron();
 registerTripShareExpiryCron();
+registerReviewReminderCron();
+registerWeeklyReviewMissionResetCron();
 
 // Start the server
 httpServer.listen(port, () => {

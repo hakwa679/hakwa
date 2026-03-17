@@ -46,6 +46,19 @@ async function processEntry(
   if (event["tripId"]) payload.tripId = event["tripId"];
   if (event["referralCode"]) payload.referralCode = event["referralCode"];
   if (event["timestamp"]) payload.timestamp = event["timestamp"];
+  if (event["reviewId"]) payload.reviewId = event["reviewId"];
+  if (event["referenceId"]) payload.referenceId = event["referenceId"];
+  if (event["sourceAction"]) {
+    payload.sourceAction = event["sourceAction"] as NonNullable<
+      GamificationEventPayload["sourceAction"]
+    >;
+  }
+  if (event["points"]) {
+    const points = Number(event["points"]);
+    if (Number.isFinite(points)) {
+      payload.points = points;
+    }
+  }
 
   if (!payload.userId) {
     await redis.xack(STREAM_KEY, GROUP_NAME, messageId);

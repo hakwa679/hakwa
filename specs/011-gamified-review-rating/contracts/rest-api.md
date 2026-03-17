@@ -434,6 +434,42 @@ production.
 
 ---
 
+## Rider Matching Driver Signal
+
+### `GET /reviews/driver-signal/:userId`
+
+Returns a minimal driver reputation object for use on rider-facing matching and
+driver-card previews.
+
+**Auth**: Required.
+
+**Response `200 OK`**:
+
+```json
+{
+  "userId": "uuid",
+  "averageRating": 4.8,
+  "totalReviewsReceived": 142,
+  "label": "4.8 ★"
+}
+```
+
+If `totalReviewsReceived < 3`:
+
+```json
+{
+  "userId": "uuid",
+  "averageRating": null,
+  "totalReviewsReceived": 1,
+  "label": "New driver"
+}
+```
+
+This endpoint is designed for low latency in matching flows and should use the
+same short-lived caching strategy as passenger signal endpoints.
+
+---
+
 ## Notification Hooks (Server-side, no direct API)
 
 The following events trigger push notifications via the notification system

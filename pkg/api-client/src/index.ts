@@ -43,9 +43,9 @@ export class HakwaApiClient {
   }
 }
 
-export * from "./mapClient.ts";
-export * from "./mapPhotoUploadClient.ts";
-export * from "./mapContributionQueue.ts";
-export * from "./hooks/useMapVerification.ts";
-export * from "./hooks/useMapStats.ts";
-export * from "./hooks/useMapPendingFeatures.ts";
+export * from "./mapClient.js";
+export * from "./mapPhotoUploadClient.js";
+export * from "./mapContributionQueue.js";
+export * from "./hooks/useMapVerification.js";
+export * from "./hooks/useMapStats.js";
+export * from "./hooks/useMapPendingFeatures.js";

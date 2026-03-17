@@ -2,7 +2,7 @@
 
 **Feature Branch**: `011-gamified-review-rating`  
 **Created**: 2026-03-16  
-**Status**: Draft  
+**Status**: Ready  
 **Input**: An engaging, gamified post-trip review and rating system for both
 passengers and drivers. Reviews must be fast to complete, intrinsically
 rewarding, and produce reputation data that is genuinely useful to both sides of
@@ -187,8 +187,8 @@ gamification feature.
 **Acceptance Scenarios**:
 
 1. **Given** a submission with `rating = 4`, no tags, no comment, **Then**
-   `pointsAwarded = 10` and a single `pointsLedger` entry with `amount = 10`
-   and `sourceAction = "review_submitted"` is created.
+   `pointsAwarded = 10` and a single `pointsLedger` entry with `amount = 10` and
+   `sourceAction = "review_submitted"` is created.
 2. **Given** a submission with `rating = 5`, 3 tags, no comment, **Then**
    `pointsAwarded = 15`.
 3. **Given** a submission with `rating = 3`, 2 tags, and a comment, **Then**
@@ -465,8 +465,8 @@ back into reviewers without being intrusive.
 - **FR-004**: The review card MUST be presented automatically on the
   trip-complete screen without requiring additional navigation.
 - **FR-005**: The three-step review flow (stars → tags → comment) MUST award
-  incremental points: base points for stars only, additional points for adding
-  one or more tags, maximum points for including a comment.
+  incremental points: base points for stars only, +5 points only when two or
+  more tags are selected, and maximum points for including a non-empty comment.
 - **FR-006**: Neither party's review content MUST be visible to the reviewee
   until both parties have submitted OR the respective review window has expired
   (double-blind rule).
@@ -489,12 +489,14 @@ back into reviewers without being intrusive.
 - **TripReview**: One record per direction per trip. Holds `tripId`, `direction`
   (`passenger_to_driver` | `driver_to_passenger`), `reviewerUserId`,
   `revieweeUserId`, `rating` (1–5), `tags` (array of tag keys), `comment`
-  (nullable, max 280 characters), `pointsAwarded`, `isVisible` (double-blind
-  gate), `createdAt`.
+  (nullable, max 280 characters), `pointsAwarded`, `createdAt`.
 - **ReviewTag**: Lookup table of predefined tag chips scoped by `direction`.
   Carries `key`, `label`, `emoji`.
 - **UserReputation**: Derived per-user summary computed from all visible
   `trip_review` records — not stored independently.
+
+Reveal status is computed at read time using counterpart submission and window
+expiry; no persisted visibility flag is stored on `trip_review`.
 
 ### Assumptions
 

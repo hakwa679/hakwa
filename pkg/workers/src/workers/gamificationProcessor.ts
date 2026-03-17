@@ -8,6 +8,10 @@ import {
   pointsAccount,
   pointsLedger,
   referral,
+  trip,
+  tripReview,
+  tripReviewTag,
+  user,
   userBadge,
 } from "@hakwa/db/schema";
 import {
@@ -26,7 +30,8 @@ type GamificationEventType =
   | "user_registered"
   | "first_trip_completed"
   | "referral_used"
-  | "map_points_awarded";
+  | "map_points_awarded"
+  | "review_submitted";
 
 export interface GamificationEventPayload {
   type: GamificationEventType;
@@ -42,8 +47,37 @@ export interface GamificationEventPayload {
     | "map_photo_bonus"
     | "map_road_trace"
     | "map_mission_completed"
-    | "map_pioneer_bonus";
+    | "map_pioneer_bonus"
+    | "review_submitted";
   referenceId?: string;
+  reviewId?: string;
+}
+
+const WEEKLY_REVIEW_MISSION_TARGET = 3;
+const WEEKLY_REVIEW_MISSION_BONUS = 50;
+
+type ReputationBadgeKey =
+  | "top_rated_driver"
+  | "consistent_driver"
+  | "five_star_passenger";
+
+function getFijiWeekKey(now: Date): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Pacific/Fiji",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const parts = formatter.formatToParts(now);
+  const year = Number(parts.find((p) => p.type === "year")?.value ?? "1970");
+  const month = Number(parts.find((p) => p.type === "month")?.value ?? "01");
+  const day = Number(parts.find((p) => p.type === "day")?.value ?? "01");
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const dow = date.getUTCDay();
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  date.setUTCDate(date.getUTCDate() + mondayOffset);
+  return date.toISOString().slice(0, 10);
 }
 
 function buildReferralCode(): string {
@@ -238,6 +272,335 @@ async function evaluateBadges(userId: string): Promise<void> {
         iconUrl: b.iconUrl,
       },
     });
+  }
+}
+
+async function evaluateReviewerBadges(userId: string): Promise<void> {
+  const [totalReviewsRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(tripReview)
+    .where(eq(tripReview.reviewerUserId, userId));
+  const totalReviews = totalReviewsRow?.count ?? 0;
+
+  const [taggedReviewsRow] = await db
+    .select({
+      count: sql<number>`count(distinct ${tripReviewTag.tripReviewId})::int`,
+    })
+    .from(tripReviewTag)
+    .innerJoin(tripReview, eq(tripReview.id, tripReviewTag.tripReviewId))
+    .where(eq(tripReview.reviewerUserId, userId));
+  const taggedReviews = taggedReviewsRow?.count ?? 0;
+
+  const completedTrips = await db
+    .select({ id: trip.id })
+    .from(trip)
+    .where(
+      and(
+        eq(trip.status, "completed"),
+        sql`(${trip.passengerId} = ${userId} OR ${trip.driverId} = ${userId})`,
+      ),
+    )
+    .orderBy(desc(trip.completedAt))
+    .limit(50);
+
+  let reviewedStreak = 0;
+  for (const t of completedTrips) {
+    const [reviewed] = await db
+      .select({ id: tripReview.id })
+      .from(tripReview)
+      .where(
+        and(eq(tripReview.tripId, t.id), eq(tripReview.reviewerUserId, userId)),
+      )
+      .limit(1);
+
+    if (!reviewed) {
+      break;
+    }
+    reviewedStreak += 1;
+  }
+
+  const milestones: Array<{ key: string; reached: boolean }> = [
+    { key: "first_review", reached: totalReviews >= 1 },
+    { key: "tagged_reviewer", reached: taggedReviews >= 5 },
+    { key: "dedicated_reviewer", reached: totalReviews >= 25 },
+    { key: "veteran_reviewer", reached: totalReviews >= 100 },
+    { key: "perfect_streak_reviewer", reached: reviewedStreak >= 7 },
+  ];
+
+  for (const milestone of milestones) {
+    if (!milestone.reached) continue;
+
+    const [inserted] = await db
+      .insert(userBadge)
+      .values({ userId, badgeKey: milestone.key })
+      .onConflictDoNothing()
+      .returning({ badgeKey: userBadge.badgeKey });
+
+    if (!inserted) continue;
+
+    const [definition] = await db
+      .select({ name: badge.name, iconUrl: badge.iconUrl })
+      .from(badge)
+      .where(eq(badge.key, milestone.key))
+      .limit(1);
+
+    await sendNotification(
+      userId,
+      "badge_earned",
+      {
+        channel: "in_app",
+        title: "Badge unlocked",
+        body: `You earned ${definition?.name ?? milestone.key}.`,
+        data: {
+          key: milestone.key,
+          name: definition?.name ?? milestone.key,
+          iconUrl: definition?.iconUrl,
+        },
+      },
+      `review_badge:${userId}:${milestone.key}`,
+    );
+  }
+}
+
+async function getVisibleReviewStatsForUser(userId: string): Promise<{
+  count: number;
+  avg: number;
+  oneStarCount: number;
+}> {
+  const reviews = await db
+    .select({
+      id: tripReview.id,
+      tripId: tripReview.tripId,
+      direction: tripReview.direction,
+      rating: tripReview.rating,
+    })
+    .from(tripReview)
+    .where(eq(tripReview.revieweeUserId, userId));
+
+  if (reviews.length === 0) {
+    return { count: 0, avg: 0, oneStarCount: 0 };
+  }
+
+  const tripIds = [...new Set(reviews.map((r) => r.tripId))];
+  const tripRows = await db
+    .select({ id: trip.id, completedAt: trip.completedAt })
+    .from(trip)
+    .where(
+      sql`${trip.id} IN (${sql.join(
+        tripIds.map((id) => sql`${id}`),
+        sql`,`,
+      )})`,
+    );
+
+  const byTrip = new Map(tripRows.map((row) => [row.id, row]));
+  const directionsByTrip = new Map<
+    string,
+    Set<"passenger_to_driver" | "driver_to_passenger">
+  >();
+  for (const review of reviews) {
+    const set = directionsByTrip.get(review.tripId) ?? new Set();
+    set.add(review.direction);
+    directionsByTrip.set(review.tripId, set);
+  }
+
+  const now = new Date();
+  const visible = reviews.filter((review) => {
+    const tripRow = byTrip.get(review.tripId);
+    if (!tripRow?.completedAt) return false;
+
+    const counterpart =
+      review.direction === "passenger_to_driver"
+        ? "driver_to_passenger"
+        : "passenger_to_driver";
+
+    const hasCounterpart =
+      directionsByTrip.get(review.tripId)?.has(counterpart) ?? false;
+    if (hasCounterpart) return true;
+
+    const windowHours = counterpart === "driver_to_passenger" ? 24 : 72;
+    const expiry = new Date(
+      tripRow.completedAt.getTime() + windowHours * 3600 * 1000,
+    );
+    return now > expiry;
+  });
+
+  if (visible.length === 0) {
+    return { count: 0, avg: 0, oneStarCount: 0 };
+  }
+
+  const sum = visible.reduce((acc, r) => acc + r.rating, 0);
+  const oneStarCount = visible.filter((r) => r.rating === 1).length;
+  return { count: visible.length, avg: sum / visible.length, oneStarCount };
+}
+
+async function emitBadgeRevokedEvent(
+  userId: string,
+  badgeKey: string,
+): Promise<void> {
+  await publishGamificationRealtime(userId, {
+    event: "badge_revoked",
+    badgeKey,
+  });
+
+  await sendNotification(
+    userId,
+    "system_alert",
+    {
+      channel: "in_app",
+      title: "Badge status updated",
+      body: `Your ${badgeKey} badge is no longer active based on recent ratings.`,
+      data: { badgeKey },
+    },
+    `badge_revoked:${userId}:${badgeKey}`,
+  );
+}
+
+async function evaluateReputationBadges(userId: string): Promise<void> {
+  const [userRow] = await db
+    .select({ role: user.role })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+
+  if (!userRow) return;
+
+  const stats = await getVisibleReviewStatsForUser(userId);
+
+  const badgeRules: Array<{ key: ReputationBadgeKey; shouldHave: boolean }> =
+    userRow.role === "driver"
+      ? [
+          {
+            key: "top_rated_driver",
+            shouldHave: stats.count >= 50 && stats.avg >= 4.8,
+          },
+          {
+            key: "consistent_driver",
+            shouldHave: stats.count >= 50 && stats.oneStarCount === 0,
+          },
+        ]
+      : [
+          {
+            key: "five_star_passenger",
+            shouldHave: stats.count >= 20 && stats.avg >= 4.8,
+          },
+        ];
+
+  for (const rule of badgeRules) {
+    const [existing] = await db
+      .select({ id: userBadge.id })
+      .from(userBadge)
+      .where(
+        and(eq(userBadge.userId, userId), eq(userBadge.badgeKey, rule.key)),
+      )
+      .limit(1);
+
+    if (rule.shouldHave && !existing) {
+      await db
+        .insert(userBadge)
+        .values({ userId, badgeKey: rule.key })
+        .onConflictDoNothing();
+      continue;
+    }
+
+    if (!rule.shouldHave && existing) {
+      await db
+        .delete(userBadge)
+        .where(
+          and(eq(userBadge.userId, userId), eq(userBadge.badgeKey, rule.key)),
+        );
+      await emitBadgeRevokedEvent(userId, rule.key);
+    }
+  }
+}
+
+async function handleWeeklyReviewMission(userId: string): Promise<void> {
+  const account = await ensurePointsAccount(userId);
+  const weekKey = getFijiWeekKey(new Date());
+  const referenceId = `mission:weekly_review_3:${weekKey}`;
+
+  const [alreadyAwarded] = await db
+    .select({ id: pointsLedger.id })
+    .from(pointsLedger)
+    .where(
+      and(
+        eq(pointsLedger.accountId, account.id),
+        eq(pointsLedger.sourceAction, "streak_bonus"),
+        eq(pointsLedger.referenceId, referenceId),
+      ),
+    )
+    .limit(1);
+
+  if (alreadyAwarded) return;
+
+  const weekStart = new Date(`${weekKey}T00:00:00.000Z`);
+  const [reviewCountRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(tripReview)
+    .where(
+      and(
+        eq(tripReview.reviewerUserId, userId),
+        sql`${tripReview.submittedAt} >= ${weekStart}`,
+      ),
+    );
+
+  const completed = reviewCountRow?.count ?? 0;
+  if (completed < WEEKLY_REVIEW_MISSION_TARGET) return;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(pointsLedger)
+      .values({
+        accountId: account.id,
+        amount: WEEKLY_REVIEW_MISSION_BONUS,
+        sourceAction: "streak_bonus",
+        referenceId,
+      })
+      .onConflictDoNothing();
+
+    await tx
+      .update(pointsAccount)
+      .set({
+        totalPoints: sql`${pointsAccount.totalPoints} + ${WEEKLY_REVIEW_MISSION_BONUS}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(pointsAccount.id, account.id));
+  });
+
+  await sendNotification(
+    userId,
+    "streak_milestone",
+    {
+      channel: "in_app",
+      title: "Weekly mission complete",
+      body: `You reviewed ${WEEKLY_REVIEW_MISSION_TARGET} trips this week and earned ${WEEKLY_REVIEW_MISSION_BONUS} points.`,
+      data: {
+        mission: "weekly_review_3",
+        bonusPoints: WEEKLY_REVIEW_MISSION_BONUS,
+      },
+    },
+    `weekly_review_mission:${userId}:${weekKey}`,
+  );
+}
+
+async function handleReviewSubmitted(payload: {
+  userId: string;
+  reviewId?: string;
+}): Promise<void> {
+  await evaluateReviewerBadges(payload.userId);
+  await handleWeeklyReviewMission(payload.userId);
+
+  if (!payload.reviewId) {
+    return;
+  }
+
+  const [review] = await db
+    .select({ revieweeUserId: tripReview.revieweeUserId })
+    .from(tripReview)
+    .where(eq(tripReview.id, payload.reviewId))
+    .limit(1);
+
+  if (review?.revieweeUserId) {
+    await evaluateReputationBadges(review.revieweeUserId);
   }
 }
 
@@ -578,6 +941,27 @@ async function handleMapPointsAwarded(eventPayload: {
   }
 }
 
+function isMapPointsSourceAction(
+  value: GamificationEventPayload["sourceAction"],
+): value is
+  | "map_contribution"
+  | "map_verification"
+  | "map_contribution_accepted"
+  | "map_photo_bonus"
+  | "map_road_trace"
+  | "map_mission_completed"
+  | "map_pioneer_bonus" {
+  return (
+    value === "map_contribution" ||
+    value === "map_verification" ||
+    value === "map_contribution_accepted" ||
+    value === "map_photo_bonus" ||
+    value === "map_road_trace" ||
+    value === "map_mission_completed" ||
+    value === "map_pioneer_bonus"
+  );
+}
+
 export async function processGamificationEvent(
   payload: GamificationEventPayload,
 ): Promise<void> {
@@ -595,7 +979,21 @@ export async function processGamificationEvent(
       await handleReferralUsed(payload);
       return;
     case "map_points_awarded":
-      await handleMapPointsAwarded(payload);
+      await handleMapPointsAwarded({
+        userId: payload.userId,
+        ...(typeof payload.points === "number"
+          ? { points: payload.points }
+          : {}),
+        ...(isMapPointsSourceAction(payload.sourceAction)
+          ? { sourceAction: payload.sourceAction }
+          : {}),
+        ...(typeof payload.referenceId === "string"
+          ? { referenceId: payload.referenceId }
+          : {}),
+      });
+      return;
+    case "review_submitted":
+      await handleReviewSubmitted(payload);
       return;
     default:
       throw new Error(`Unsupported gamification event: ${payload.type}`);

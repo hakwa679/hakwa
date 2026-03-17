@@ -12,7 +12,8 @@ function randomSuffix(length = 4): string {
   const bytes = randomBytes(length);
   let output = "";
   for (let i = 0; i < length; i += 1) {
-    output += alphabet[bytes[i] % alphabet.length];
+    const byte = bytes[i] ?? 0;
+    output += alphabet[byte % alphabet.length];
   }
   return output;
 }

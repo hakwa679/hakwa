@@ -64,17 +64,21 @@ export type NewPointsAccount = typeof pointsAccount.$inferInsert;
 // Points ledger — immutable audit log of every points change
 // ---------------------------------------------------------------------------
 
-export const pointsLedger = pgTable("points_ledger", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  accountId: uuid("account_id")
-    .notNull()
-    .references(() => pointsAccount.id, { onDelete: "cascade" }),
-  amount: integer("amount").notNull(),
-  sourceAction: text("source_action").notNull().$type<PointsSourceAction>(),
-  /** ID of the entity that triggered this entry (e.g. tripId, referralId). */
-  referenceId: text("reference_id"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const pointsLedger = pgTable(
+  "points_ledger",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => pointsAccount.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+    sourceAction: text("source_action").notNull().$type<PointsSourceAction>(),
+    /** ID of the entity that triggered this entry (e.g. tripId, referralId). */
+    referenceId: text("reference_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [unique().on(t.accountId, t.sourceAction, t.referenceId)],
+);
 
 export type PointsLedgerEntry = typeof pointsLedger.$inferSelect;
 export type NewPointsLedgerEntry = typeof pointsLedger.$inferInsert;

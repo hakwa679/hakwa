@@ -1,3 +1,27 @@
+## Backend Quick Validation
+
+1. Start API and ensure review tags are seeded on boot.
+2. Submit a passenger review with stars only and verify points = 10.
+3. Submit a driver review with 2 tags and verify points = 15.
+4. Submit with 2 tags + comment and verify points = 25.
+5. Confirm `GET /api/v1/reviews/trip/:tripId` hides counterpart until
+   submit/expiry.
+6. Confirm `GET /api/v1/reviews/me/dashboard` returns monthly averages, tags,
+   and annotations.
+
+## Jobs
+
+- Review reminder: runs hourly and dispatches reminders 6h before expiry.
+- Weekly review mission reset: runs weekly (Fiji Monday boundary).
+
+## Mobile Scaffolding
+
+- Passenger review card scaffold:
+  `apps/mobile/passenger/src/screens/TripComplete/ReviewCard.tsx`
+- Driver review card scaffold:
+  `apps/mobile/driver/src/screens/TripComplete/ReviewCard.tsx`
+- Shared flow logic: `pkg/ui-native/src/review/reviewFlow.ts`
+
 # Quickstart: Gamified Review & Rating System
 
 ## Prerequisites

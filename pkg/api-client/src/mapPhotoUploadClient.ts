@@ -1,4 +1,4 @@
-import { HakwaApiClient } from "./index.ts";
+import { HakwaApiClient } from "./index.js";
 
 export interface PrepareMapPhotoUploadRequest {
   fileName: string;

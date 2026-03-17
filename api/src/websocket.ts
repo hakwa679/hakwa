@@ -76,6 +76,7 @@ const handleConnection = (
     // Subscribe to this user's notification channel on first connection
     const notifChannel = `user:${userId}:notifications`;
     const gamificationChannel = `user:${userId}:gamification`;
+    const reviewRevealChannel = `review:revealed:${userId}`;
     redisSubscriber.subscribe(notifChannel, (err) => {
       if (err) {
         console.error("[ws] redis subscribe error", {
@@ -103,6 +104,21 @@ const handleConnection = (
           event: "ws.subscribed",
           userId,
           channel: gamificationChannel,
+        });
+      }
+    });
+    redisSubscriber.subscribe(reviewRevealChannel, (err) => {
+      if (err) {
+        console.error("[ws] redis subscribe error", {
+          event: "ws.subscribed",
+          userId,
+          err,
+        });
+      } else {
+        console.info("[ws] subscribed to review reveal channel", {
+          event: "ws.subscribed",
+          userId,
+          channel: reviewRevealChannel,
         });
       }
     });
@@ -216,6 +232,7 @@ const handleConnection = (
         // Unsubscribe once the last connection for this user closes
         const notificationChannel = `user:${userId}:notifications`;
         const gamificationChannel = `user:${userId}:gamification`;
+        const reviewRevealChannel = `review:revealed:${userId}`;
         redisSubscriber.unsubscribe(notificationChannel, (err) => {
           if (err) {
             console.error("[ws] redis unsubscribe error", { userId, err });
@@ -235,6 +252,17 @@ const handleConnection = (
               event: "ws.unsubscribed",
               userId,
               channel: gamificationChannel,
+            });
+          }
+        });
+        redisSubscriber.unsubscribe(reviewRevealChannel, (err) => {
+          if (err) {
+            console.error("[ws] redis unsubscribe error", { userId, err });
+          } else {
+            console.info("[ws] unsubscribed from review reveal channel", {
+              event: "ws.unsubscribed",
+              userId,
+              channel: reviewRevealChannel,
             });
           }
         });
@@ -303,7 +331,8 @@ redisSubscriber.on("message", (channel: string, message: string) => {
   // 4. user:{userId}:notifications or user:{userId}:gamification fan-out
   const match = /^user:(.+):notifications$/.exec(channel);
   const gamificationMatch = /^user:(.+):gamification$/.exec(channel);
-  const userId = match?.[1] ?? gamificationMatch?.[1];
+  const reviewRevealMatch = /^review:revealed:(.+)$/.exec(channel);
+  const userId = match?.[1] ?? gamificationMatch?.[1] ?? reviewRevealMatch?.[1];
   if (!userId) return;
 
   const conns = userConnections.get(userId);

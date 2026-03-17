@@ -1,5 +1,5 @@
 import type { MapFeatureInput } from "@hakwa/types";
-import { MapClient } from "./mapClient.ts";
+import { MapClient } from "./mapClient.js";
 
 export interface MapContributionQueueItem {
   id: string;

@@ -11,7 +11,7 @@ import type {
   VerifyMapFeatureInput,
   VerifyMapFeatureResponse,
 } from "@hakwa/types";
-import { HakwaApiClient } from "./index.ts";
+import { HakwaApiClient } from "./index.js";
 
 export class MapClient {
   constructor(private readonly client: HakwaApiClient) {}

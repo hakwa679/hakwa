@@ -155,10 +155,11 @@ safetyRouter.post("/sos", sosRateLimit, async (req, res, next) => {
 
     const result = await triggerSOS({
       userId,
-      tripId,
       silent,
-      location:
-        Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : undefined,
+      ...(tripId ? { tripId } : {}),
+      ...(Number.isFinite(lat) && Number.isFinite(lng)
+        ? { location: { lat, lng } }
+        : {}),
     });
 
     res.status(result.duplicate ? 200 : 201).json(result);
@@ -384,24 +385,20 @@ safetyRouter.post("/incidents/:incidentId/evidence", async (req, res, next) => {
       error instanceof Error &&
       error.message === "SAFETY_EVIDENCE_INVALID_TYPE"
     ) {
-      res
-        .status(422)
-        .json({
-          code: "SAFETY_EVIDENCE_INVALID_TYPE",
-          message: "Invalid evidence type.",
-        });
+      res.status(422).json({
+        code: "SAFETY_EVIDENCE_INVALID_TYPE",
+        message: "Invalid evidence type.",
+      });
       return;
     }
     if (
       error instanceof Error &&
       error.message === "SAFETY_EVIDENCE_TOO_LARGE"
     ) {
-      res
-        .status(413)
-        .json({
-          code: "SAFETY_EVIDENCE_TOO_LARGE",
-          message: "Evidence too large.",
-        });
+      res.status(413).json({
+        code: "SAFETY_EVIDENCE_TOO_LARGE",
+        message: "Evidence too large.",
+      });
       return;
     }
     next(error);
@@ -438,12 +435,10 @@ safetyRouter.post("/check-ins/:checkInId/respond", async (req, res, next) => {
       error instanceof Error &&
       error.message === "SAFETY_CHECK_IN_NOT_FOUND"
     ) {
-      res
-        .status(404)
-        .json({
-          code: "SAFETY_CHECK_IN_NOT_FOUND",
-          message: "Check-in not found.",
-        });
+      res.status(404).json({
+        code: "SAFETY_CHECK_IN_NOT_FOUND",
+        message: "Check-in not found.",
+      });
       return;
     }
     if (

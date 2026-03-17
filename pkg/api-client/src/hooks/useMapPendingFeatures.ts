@@ -2,7 +2,7 @@ import type {
   PendingMapFeaturesQuery,
   PendingMapFeaturesResponse,
 } from "@hakwa/types";
-import { MapClient } from "../mapClient.ts";
+import { MapClient } from "../mapClient.js";
 
 export interface MapPendingFeaturesQuery {
   list(query: PendingMapFeaturesQuery): Promise<PendingMapFeaturesResponse>;

@@ -4,13 +4,13 @@ function toRoute(path: string): Href {
   switch (path) {
     case "booking":
     case "trip":
-      return "/(tabs)/index";
+      return "/(tabs)";
     case "wallet":
-      return "/(tabs)/earnings";
+      return "/(tabs)";
     case "badge":
       return "/(tabs)/explore";
     case "notifications":
-      return "/(tabs)/notifications";
+      return "/(tabs)";
     default:
       return "/(tabs)";
   }
@@ -30,7 +30,7 @@ export function routeNotificationData(
   const screen =
     typeof data?.["screen"] === "string" ? data["screen"] : undefined;
   if (screen === "DriverNavigation" || screen === "ActiveTrip") {
-    router.push("/(tabs)/index");
+    router.push("/(tabs)");
     return;
   }
 

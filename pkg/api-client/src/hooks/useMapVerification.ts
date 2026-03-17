@@ -2,7 +2,7 @@ import type {
   VerifyMapFeatureInput,
   VerifyMapFeatureResponse,
 } from "@hakwa/types";
-import { MapClient } from "../mapClient.ts";
+import { MapClient } from "../mapClient.js";
 
 export interface MapVerificationAction {
   verify(

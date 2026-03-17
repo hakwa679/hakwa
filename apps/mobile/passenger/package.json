@@ -2,6 +2,7 @@
   "name": "@hakwa/passenger",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -11,6 +12,7 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@hakwa/ui-native": "*",
     "@hakwa/api-client": "*",
     "@expo/vector-icons": "^15.0.3",
     "@react-navigation/bottom-tabs": "^7.4.0",

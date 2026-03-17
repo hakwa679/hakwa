@@ -4,7 +4,8 @@
     "type": "module",
     "exports": {
         ".": "./index.ts",
-        "./map": "./src/mapErrors.ts"
+        "./map": "./src/mapErrors.ts",
+        "./reviews": "./src/reviewErrors.ts"
     },
     "types": "./index.ts"
 }

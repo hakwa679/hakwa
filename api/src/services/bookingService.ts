@@ -8,6 +8,7 @@ import {
   DRIVER_RESPONSE_TIMEOUT_SECONDS,
   CANCELLATION_GRACE_PERIOD_SECONDS,
 } from "@hakwa/core";
+import { getDriverSignal, getPassengerSignal } from "./reviewService.ts";
 
 // ---------------------------------------------------------------------------
 // Error classes
@@ -195,7 +196,11 @@ async function offerToDriver(
 
 export async function dispatchLoop(tripId: string): Promise<void> {
   const tripRow = await db
-    .select({ pickupLat: trip.pickupLat, pickupLng: trip.pickupLng })
+    .select({
+      pickupLat: trip.pickupLat,
+      pickupLng: trip.pickupLng,
+      passengerId: trip.passengerId,
+    })
     .from(trip)
     .where(eq(trip.id, tripId))
     .limit(1);
@@ -221,6 +226,10 @@ export async function dispatchLoop(tripId: string): Promise<void> {
 
     if (!current[0] || current[0].status !== "pending") break;
 
+    const passengerSignal = await getPassengerSignal(tripRow[0].passengerId)
+      .then((signal) => signal)
+      .catch(() => null);
+
     // Notify driver of offer (fire-and-forget; driver app logic in feature 004)
     redis
       .publish(
@@ -228,6 +237,7 @@ export async function dispatchLoop(tripId: string): Promise<void> {
         JSON.stringify({
           type: "ride_offer",
           tripId,
+          passengerRating: passengerSignal,
           at: new Date().toISOString(),
         }),
       )
@@ -262,9 +272,14 @@ export async function dispatchLoop(tripId: string): Promise<void> {
         .where(eq(userTable.id, driver.userId))
         .limit(1);
 
+      const driverSignal = await getDriverSignal(driver.userId)
+        .then((signal) => signal)
+        .catch(() => null);
+
       publishBookingStatus(tripId, "accepted", {
         driverId: driver.userId,
         driverName: driverRecord[0]?.name ?? "Your driver",
+        driverRating: driverSignal,
       });
 
       // Notify passenger

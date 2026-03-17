@@ -1,5 +1,5 @@
 import type { MapStatsResponse } from "@hakwa/types";
-import { MapClient } from "../mapClient.ts";
+import { MapClient } from "../mapClient.js";
 
 export interface MapStatsQuery {
   get(): Promise<MapStatsResponse>;
