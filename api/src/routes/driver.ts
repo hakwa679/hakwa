@@ -4,9 +4,9 @@ import {
   type Response,
   type NextFunction,
 } from "express";
-import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 import db from "@hakwa/db";
-import { ledgerEntry, trip, user as userTable, wallet } from "@hakwa/db/schema";
+import { ledgerEntry, trip, user as userTable } from "@hakwa/db/schema";
 import { getSessionFromRequest } from "@hakwa/auth";
 import { requireRole } from "../middleware/requireRole.ts";
 import {
@@ -336,24 +336,10 @@ driverRouter.get(
     const limit = Math.min(Number(query["limit"] ?? 20), 100);
 
     try {
-      // Find driver's wallets (individual or merchant)
-      const driverWallets = await db
-        .select({ id: wallet.id })
-        .from(wallet)
-        .where(eq(wallet.holderId, driverId));
-
-      if (driverWallets.length === 0) {
-        res.json({ items: [], nextCursor: null });
-        return;
-      }
-
-      const walletIds = driverWallets.map((w) => w.id);
-
       const whereConditions = [
-        eq(ledgerEntry.type, "credit"),
-        eq(ledgerEntry.transactionType, "ride_payment"),
-        inArray(ledgerEntry.walletId, walletIds),
-        ...(cursor ? [lt(ledgerEntry.date, new Date(cursor))] : []),
+        eq(ledgerEntry.holderId, driverId),
+        eq(ledgerEntry.entryType, "trip_credit"),
+        ...(cursor ? [lt(ledgerEntry.createdAt, new Date(cursor))] : []),
       ];
 
       const rows = await db
@@ -361,11 +347,11 @@ driverRouter.get(
           ledgerEntryId: ledgerEntry.id,
           amount: ledgerEntry.amount,
           description: ledgerEntry.description,
-          date: ledgerEntry.date,
+          createdAt: ledgerEntry.createdAt,
         })
         .from(ledgerEntry)
         .where(and(...whereConditions))
-        .orderBy(desc(ledgerEntry.date))
+        .orderBy(desc(ledgerEntry.createdAt))
         .limit(limit + 1);
 
       const hasMore = rows.length > limit;
@@ -375,11 +361,11 @@ driverRouter.get(
         items: items.map((row) => ({
           ledgerEntryId: row.ledgerEntryId,
           driverEarnings: row.amount,
-          date: row.date?.toISOString(),
+          date: row.createdAt?.toISOString(),
           description: row.description,
         })),
         nextCursor: hasMore
-          ? (items[items.length - 1]?.date?.toISOString() ?? null)
+          ? (items[items.length - 1]?.createdAt?.toISOString() ?? null)
           : null,
       });
     } catch (err) {

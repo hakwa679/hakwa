@@ -3,6 +3,7 @@ import db from "@hakwa/db";
 import { ledgerEntry, HolderType, type EntryType } from "@hakwa/db/schema";
 import { redis } from "@hakwa/redis";
 import { sendNotification } from "@hakwa/notifications";
+import { nextPayoutDate } from "@hakwa/core";
 
 // ---------------------------------------------------------------------------
 // T005 — getMerchantBalance
@@ -14,6 +15,7 @@ export interface WalletBalance {
   currency: "FJD";
   pendingPayoutAmount: string;
   lastPayoutAt: string | null;
+  nextPayoutAt: string;
 }
 
 export async function getMerchantBalance(
@@ -56,6 +58,7 @@ export async function getMerchantBalance(
     currency: "FJD",
     pendingPayoutAmount,
     lastPayoutAt: lastPayout?.createdAt?.toISOString() ?? null,
+    nextPayoutAt: nextPayoutDate(new Date()).toISOString(),
   };
 }
 

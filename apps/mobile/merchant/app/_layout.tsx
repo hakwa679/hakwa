@@ -145,6 +145,22 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="payouts/index"
+          options={{
+            title: "Payout history",
+            headerStyle: { backgroundColor: "#151718" },
+            headerTintColor: "#ECEDEE",
+          }}
+        />
+        <Stack.Screen
+          name="payouts/[payoutId]"
+          options={{
+            title: "Payout detail",
+            headerStyle: { backgroundColor: "#151718" },
+            headerTintColor: "#ECEDEE",
+          }}
+        />
+        <Stack.Screen
           name="modal"
           options={{ presentation: "modal", title: "Modal" }}
         />

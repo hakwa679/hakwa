@@ -1,4 +1,4 @@
-import { calculateFare, BASE_FARE_FJD, RATE_PER_KM_FJD } from "@hakwa/core";
+import { calculateFare, BASE_FARE_FJD } from "@hakwa/core";
 
 export interface FareCalculationInput {
   pickupLat: number;

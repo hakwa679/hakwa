@@ -17,7 +17,10 @@ import { bookingsRouter } from "./routes/bookings.ts";
 import { driverRouter } from "./routes/driver.ts";
 import { lockoutSignInMiddleware } from "./middleware/lockout.ts";
 import { runReEngagementJob } from "./jobs/reEngagement.ts";
+import { registerWeeklyPayoutCron } from "./jobs/weeklyPayout.ts";
 import { merchantWalletRouter } from "./routes/merchantWallet.ts";
+import { merchantPayoutsRouter } from "./routes/merchantPayouts.ts";
+import { internalPayoutsRouter } from "./routes/internal/payouts.ts";
 import { tripsRouter } from "./routes/trips.ts";
 
 const server = express();
@@ -40,6 +43,8 @@ server.use("/api/merchants", merchantsRouter);
 server.use("/api/bookings", bookingsRouter);
 server.use("/api/driver", driverRouter);
 server.use("/api/merchant/wallet", merchantWalletRouter);
+server.use("/api/merchant/payouts", merchantPayoutsRouter);
+server.use("/api/internal/payouts", internalPayoutsRouter);
 server.use("/api/trips", tripsRouter);
 
 // WebSocket
@@ -89,6 +94,8 @@ cron.schedule("0 21 * * *", () => {
     console.error("[cron] re-engagement job failed", { err });
   });
 });
+
+registerWeeklyPayoutCron();
 
 // Start the server
 httpServer.listen(port, () => {

@@ -37,6 +37,9 @@ export default function TripReceiptScreen() {
   const [trip, setTrip] = useState<TripDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [emailStatus, setEmailStatus] = useState<
+    "idle" | "sending" | "sent" | "error"
+  >("idle");
 
   useEffect(() => {
     if (!tripId) return;
@@ -56,6 +59,25 @@ export default function TripReceiptScreen() {
       }
     })();
   }, [tripId]);
+
+  const handleEmailReceipt = async () => {
+    if (emailStatus === "sending" || emailStatus === "sent") return;
+    setEmailStatus("sending");
+    try {
+      const token = await SecureStore.getItemAsync("session_token");
+      const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt/email`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 202) {
+        setEmailStatus("sent");
+      } else {
+        setEmailStatus("error");
+      }
+    } catch {
+      setEmailStatus("error");
+    }
+  };
 
   if (loading) {
     return (
@@ -185,6 +207,23 @@ export default function TripReceiptScreen() {
       )}
 
       <Pressable
+        style={[
+          styles.emailBtn,
+          emailStatus === "sent" && styles.emailBtnSent,
+          emailStatus === "error" && styles.emailBtnError,
+        ]}
+        onPress={handleEmailReceipt}
+        disabled={emailStatus === "sending" || emailStatus === "sent"}
+      >
+        <Text style={styles.emailBtnText}>
+          {emailStatus === "idle" && "Email receipt"}
+          {emailStatus === "sending" && "Sending…"}
+          {emailStatus === "sent" && "Receipt sent!"}
+          {emailStatus === "error" && "Retry sending"}
+        </Text>
+      </Pressable>
+
+      <Pressable
         style={styles.doneBtn}
         onPress={() => router.push("/")}
       >
@@ -283,4 +322,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   doneBtnText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
+  emailBtn: {
+    backgroundColor: "#0a7ea4",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  emailBtnSent: { backgroundColor: "#4CAF50" },
+  emailBtnError: { backgroundColor: "#EF5350" },
+  emailBtnText: { color: "#FFF", fontSize: 15, fontWeight: "600" },
 });

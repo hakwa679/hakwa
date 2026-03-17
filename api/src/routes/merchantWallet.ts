@@ -6,7 +6,10 @@ import {
 } from "express";
 import { getSessionFromRequest } from "@hakwa/auth";
 import { requireRole } from "../middleware/requireRole.ts";
-import { getMerchantBalance, getLedgerPage } from "../services/walletService.ts";
+import {
+  getMerchantBalance,
+  getLedgerPage,
+} from "../services/walletService.ts";
 import { HolderType } from "@hakwa/db/schema";
 import { ForbiddenError } from "../services/merchantService.ts";
 

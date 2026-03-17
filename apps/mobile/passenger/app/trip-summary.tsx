@@ -12,16 +12,17 @@ import { FareBreakdownCard } from "../components/FareBreakdownCard";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
-interface TripDetails {
+interface ReceiptDetails {
   tripId: string;
-  status: string;
-  driver?: { id?: string; name?: string } | null;
-  estimatedFare?: string | null;
-  estimatedDistanceKm?: string | null;
-  fare?: string | null;
-  pickupAddress?: string | null;
-  destinationAddress?: string | null;
-  completedAt?: string | null;
+  pickupAddress: string | null;
+  dropoffAddress: string | null;
+  actualDistanceKm: string | null;
+  baseFare: string;
+  ratePerKm: string;
+  totalFare: string | null;
+  currency: string;
+  completedAt: string | null;
+  driverName: string | null;
 }
 
 /**
@@ -31,7 +32,7 @@ interface TripDetails {
 export default function TripSummaryScreen() {
   const router = useRouter();
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const [trip, setTrip] = useState<TripDetails | null>(null);
+  const [receipt, setReceipt] = useState<ReceiptDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,12 +40,12 @@ export default function TripSummaryScreen() {
     (async () => {
       try {
         const token = await SecureStore.getItemAsync("hakwa_token");
-        const res = await fetch(`${API_URL}/api/bookings/${tripId}`, {
+        const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (res.ok) {
-          const data = (await res.json()) as TripDetails;
-          setTrip(data);
+          const data = (await res.json()) as ReceiptDetails;
+          setReceipt(data);
         }
       } catch {
         // best-effort
@@ -65,34 +66,37 @@ export default function TripSummaryScreen() {
     );
   }
 
-  const fare = trip?.fare ?? trip?.estimatedFare ?? "–";
-  const distanceKm = trip?.estimatedDistanceKm ?? "–";
+  const totalFare = receipt?.totalFare ?? "–";
+  const baseFare = receipt?.baseFare ?? "2.50";
+  const distanceKm = receipt?.actualDistanceKm ?? "0";
+  const distanceFare = Math.max(
+    0,
+    parseFloat(totalFare) - parseFloat(baseFare),
+  ).toFixed(2);
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Trip complete</Text>
       <Text style={styles.subtitle}>Thanks for riding with Hakwa!</Text>
 
-      {trip && (
+      {receipt && (
         <>
           <FareBreakdownCard
-            estimatedFare={fare}
-            baseFare="2.50"
-            distanceFare={(parseFloat(fare) > 0
-              ? parseFloat(fare) - 2.5
-              : 0
-            ).toFixed(2)}
-            distanceKm={distanceKm}
+            estimatedFare={totalFare}
+            baseFare={baseFare}
+            distanceFare={distanceFare}
+            distanceKm={parseFloat(distanceKm).toFixed(2)}
+            currency={receipt.currency}
           />
 
-          {trip.driver?.name && (
-            <Text style={styles.driverLine}>Driver: {trip.driver.name}</Text>
+          {receipt.driverName && (
+            <Text style={styles.driverLine}>Driver: {receipt.driverName}</Text>
           )}
-          {trip.pickupAddress && (
-            <Text style={styles.addrLine}>From: {trip.pickupAddress}</Text>
+          {receipt.pickupAddress && (
+            <Text style={styles.addrLine}>From: {receipt.pickupAddress}</Text>
           )}
-          {trip.destinationAddress && (
-            <Text style={styles.addrLine}>To: {trip.destinationAddress}</Text>
+          {receipt.dropoffAddress && (
+            <Text style={styles.addrLine}>To: {receipt.dropoffAddress}</Text>
           )}
         </>
       )}

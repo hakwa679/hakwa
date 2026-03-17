@@ -35,7 +35,10 @@ export function calculateFare(distanceKm: number): number {
  * Split a fare into platform commission and merchant share.
  * Merchant amount = fare - platform to avoid off-by-one cent rounding gaps.
  */
-export function splitFare(fare: number): { platform: number; merchant: number } {
+export function splitFare(fare: number): {
+  platform: number;
+  merchant: number;
+} {
   const platform = +(fare * PLATFORM_COMMISSION_RATE).toFixed(2);
   const merchant = +(fare - platform).toFixed(2);
   return { platform, merchant };

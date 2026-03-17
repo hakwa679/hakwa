@@ -24,14 +24,14 @@ ORM, PostgreSQL, `@hakwa/workers`, `@hakwa/notifications`, `@hakwa/core`, Expo
 **Purpose**: Confirm schema enum values and bank transfer stub before worker
 code is written
 
-- [ ] T001 Confirm `payoutBatchStatusEnum` values (`scheduled`, `processing`,
+- [X] T001 Confirm `payoutBatchStatusEnum` values (`scheduled`, `processing`,
       `completed`) in `pkg/db/schema/wallet.ts`
-- [ ] T002 Confirm `payoutStatusEnum` values (`pending`, `processing`,
+- [X] T002 Confirm `payoutStatusEnum` values (`pending`, `processing`,
       `succeeded`, `failed`) in `pkg/db/schema/wallet.ts`
-- [ ] T003 Implement `BankTransferService` interface and Phase 1 stub in
+- [X] T003 Implement `BankTransferService` interface and Phase 1 stub in
       `pkg/core/src/bankTransfer.ts` — stub records attempt, returns
       `{ success: true }` (no real bank API)
-- [ ] T004 Implement `nextPayoutDate(now: Date): Date` utility in
+- [X] T004 Implement `nextPayoutDate(now: Date): Date` utility in
       `pkg/core/src/payoutSchedule.ts` — returns the next Monday 00:00 Fiji time
       (UTC+12); accounts for "already processing this week" case
 
@@ -44,20 +44,20 @@ end-to-end batch testing
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Implement `processBatch(batchId)` in
+- [X] T005 Implement `processBatch(batchId)` in
       `pkg/workers/src/workers/payoutProcessor.ts` — for each merchant with
       balance > `PAYOUT_SERVICE_FEE_FJD`: create `payout` row, atomically write
       `payout_debit` + `payout_service_fee_debit` ledger entries in same Drizzle
       transaction, call `BankTransferService`, update payout status to
       `succeeded` or `failed`
-- [ ] T006 [P] Implement idempotent batch creation in
+- [X] T006 [P] Implement idempotent batch creation in
       `api/src/jobs/weeklyPayout.ts` —
       `INSERT INTO payoutBatch (weekStart, status) VALUES (monday, 'scheduled') ON CONFLICT (weekStart) DO NOTHING`;
       return existing batch ID if already exists
-- [ ] T007 [P] Implement cron registration in `api/src/jobs/weeklyPayout.ts` —
+- [X] T007 [P] Implement cron registration in `api/src/jobs/weeklyPayout.ts` —
       schedule `processBatch` every Monday 00:00 Fiji time using a Node.js cron
       library
-- [ ] T008 Register internal payout routes in `api/src/index.ts` by mounting
+- [X] T008 Register internal payout routes in `api/src/index.ts` by mounting
       `api/src/routes/internal/payouts.ts` (protected — not public-facing)
 
 **Checkpoint**: Foundation complete — payout worker, idempotent batch creation,
@@ -76,17 +76,17 @@ merchants, writes atomic ledger debits, and transitions batch to `completed`.
 with balance > 1.00; two `ledgerEntry` rows per payout (`payout_debit` +
 `payout_service_fee_debit`) exist; batch status becomes `completed`.
 
-- [ ] T009 [US1] Implement `POST /api/internal/payouts/batches` in
+- [X] T009 [US1] Implement `POST /api/internal/payouts/batches` in
       `api/src/routes/internal/payouts.ts` — create batch for given `weekStart`
       using idempotent insert; return `{ batchId, status, weekStart }`
-- [ ] T010 [US1] Implement `POST /api/internal/payouts/batches/:batchId/process`
+- [X] T010 [US1] Implement `POST /api/internal/payouts/batches/:batchId/process`
       in `api/src/routes/internal/payouts.ts` — transition batch to
       `processing`, dispatch `processBatch(batchId)` to worker pool, wait for
       completion, transition to `completed`
-- [ ] T011 [US1] Skip merchants with balance ≤ `PAYOUT_SERVICE_FEE_FJD` in
+- [X] T011 [US1] Skip merchants with balance ≤ `PAYOUT_SERVICE_FEE_FJD` in
       `payoutProcessor.ts` — no payout row created; balance carries forward
       naturally
-- [ ] T012 [US1] Snapshot `bankAccountId` at payout creation time in
+- [X] T012 [US1] Snapshot `bankAccountId` at payout creation time in
       `payoutProcessor.ts` — store snapshot so mid-batch account updates don't
       affect current payout
 
@@ -106,15 +106,15 @@ payout triggers a new bank transfer attempt; on success, `payout.status` =
 `succeeded`; on failure, `payout.status` = `failed` with updated
 `failureReason`; ledger entry count unchanged (no new debit added on retry).
 
-- [ ] T013 [US2] Implement `POST /api/internal/payouts/:payoutId/retry` in
+- [X] T013 [US2] Implement `POST /api/internal/payouts/:payoutId/retry` in
       `api/src/routes/internal/payouts.ts` — validate payout is `failed` and
       belongs to current or prior batch week; call `BankTransferService` only
       (no new ledger debit); update status to `succeeded` or `failed` with
       reason
-- [ ] T014 [US2] Validate no double-debit on retry in `payoutProcessor.ts` —
+- [X] T014 [US2] Validate no double-debit on retry in `payoutProcessor.ts` —
       retry path MUST NOT create new ledger entries; only the initial
       `pending → processing` transition inserts debit entries
-- [ ] T015 [US2] Notify merchant of retry outcome via `@hakwa/notifications` —
+- [X] T015 [US2] Notify merchant of retry outcome via `@hakwa/notifications` —
       success notification "Your payout of FJD [amount] succeeded" or failure
       notification with failure reason
 
@@ -133,18 +133,18 @@ newest-first with `weekPeriod`, `amount`, `serviceFee`, `netAmount`, `status`;
 `GET /api/merchant/payouts/:payoutId` returns detail with `failureReason` for
 failed payouts.
 
-- [ ] T016 [US3] Implement `GET /api/merchant/payouts` in
+- [X] T016 [US3] Implement `GET /api/merchant/payouts` in
       `api/src/routes/merchantPayouts.ts` — return paginated payouts for
       requesting merchant, sorted newest-first, with computed `weekPeriod` label
       (e.g., "Mar 10 – Mar 16, 2026")
-- [ ] T017 [US3] Implement `GET /api/merchant/payouts/:payoutId` in
+- [X] T017 [US3] Implement `GET /api/merchant/payouts/:payoutId` in
       `api/src/routes/merchantPayouts.ts` — return payout detail including
       `failureReason` and message "funds remain in your wallet balance" for
       `failed` status
-- [ ] T018 [P] [US3] Build `PayoutsScreen.tsx` in
+- [X] T018 [P] [US3] Build `PayoutsScreen.tsx` in
       `apps/mobile/merchant/src/screens/PayoutsScreen.tsx` — FlatList of payouts
       with week period, net amount, status badge; "Load more" pagination
-- [ ] T019 [P] [US3] Build `PayoutDetailScreen.tsx` in
+- [X] T019 [P] [US3] Build `PayoutDetailScreen.tsx` in
       `apps/mobile/merchant/src/screens/PayoutDetailScreen.tsx` — full payout
       detail with gross amount, service fee, net amount, failure reason (if
       failed), "Funds remain in your wallet" note
@@ -163,10 +163,10 @@ navigating to settings.
 `nextPayoutAt` field from `nextPayoutDate()` utility; `EarningsScreen` renders
 the date.
 
-- [ ] T020 [US4] Update `GET /api/merchant/wallet/balance` in
+- [X] T020 [US4] Update `GET /api/merchant/wallet/balance` in
       `api/src/routes/merchantWallet.ts` — include `nextPayoutAt` field computed
       from `nextPayoutDate(now)`
-- [ ] T021 [US4] Add "Next payout" date row to `EarningsScreen.tsx` in
+- [X] T021 [US4] Add "Next payout" date row to `EarningsScreen.tsx` in
       `apps/mobile/merchant/src/screens/EarningsScreen.tsx` (if exists) or
       `WalletScreen.tsx` — display `nextPayoutAt` in human-readable format
 

@@ -16,15 +16,17 @@ import {
   View,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import { useRouter } from "expo-router";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
-const WS_URL = (API_URL.replace(/^http/, "ws")) + "/ws";
+const WS_URL = API_URL.replace(/^http/, "ws") + "/ws";
 
 interface WalletBalance {
   balance: string;
   currency: string;
   pendingPayoutAmount: string;
   lastPayoutAt: string | null;
+  nextPayoutAt: string;
 }
 
 interface LedgerItem {
@@ -47,6 +49,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 export default function WalletScreen() {
+  const router = useRouter();
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [items, setItems] = useState<LedgerItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -81,9 +84,12 @@ export default function WalletScreen() {
   const fetchLedger = useCallback(async () => {
     try {
       const headers = await authHeaders();
-      const res = await fetch(`${API_URL}/api/merchant/wallet/ledger?limit=20`, {
-        headers,
-      });
+      const res = await fetch(
+        `${API_URL}/api/merchant/wallet/ledger?limit=20`,
+        {
+          headers,
+        },
+      );
       if (res.ok) {
         const page = (await res.json()) as LedgerPage;
         setItems(page.items);
@@ -146,7 +152,9 @@ export default function WalletScreen() {
 
     const connect = async () => {
       const token = await SecureStore.getItemAsync("hakwa_token");
-      const url = token ? `${WS_URL}?token=${encodeURIComponent(token)}` : WS_URL;
+      const url = token
+        ? `${WS_URL}?token=${encodeURIComponent(token)}`
+        : WS_URL;
       ws = new WebSocket(url);
       wsRef.current = ws;
 
@@ -195,7 +203,9 @@ export default function WalletScreen() {
           <Text style={styles.ledgerLabel}>{item.label}</Text>
           <Text style={styles.ledgerDate}>{formatDate(item.createdAt)}</Text>
         </View>
-        <Text style={[styles.ledgerAmount, isCredit ? styles.credit : styles.debit]}>
+        <Text
+          style={[styles.ledgerAmount, isCredit ? styles.credit : styles.debit]}
+        >
           {isCredit ? "+" : ""}
           {formatCurrency(item.amount)}
         </Text>
@@ -206,7 +216,10 @@ export default function WalletScreen() {
   if (loadingBalance && loadingLedger) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#0a7ea4" />
+        <ActivityIndicator
+          size="large"
+          color="#0a7ea4"
+        />
       </View>
     );
   }
@@ -219,16 +232,31 @@ export default function WalletScreen() {
         <Text style={styles.balanceAmount}>
           {balance ? formatCurrency(balance.balance, balance.currency) : "—"}
         </Text>
-        {balance?.pendingPayoutAmount && parseFloat(balance.pendingPayoutAmount) > 0 && (
-          <Text style={styles.pendingText}>
-            Pending payout: {formatCurrency(balance.pendingPayoutAmount, balance.currency)}
-          </Text>
-        )}
+        {balance?.pendingPayoutAmount &&
+          parseFloat(balance.pendingPayoutAmount) > 0 && (
+            <Text style={styles.pendingText}>
+              Pending payout:{" "}
+              {formatCurrency(balance.pendingPayoutAmount, balance.currency)}
+            </Text>
+          )}
         {balance?.lastPayoutAt && (
           <Text style={styles.lastPayoutText}>
             Last payout: {formatDate(balance.lastPayoutAt)}
           </Text>
         )}
+        {balance?.nextPayoutAt && (
+          <Text style={styles.lastPayoutText}>
+            Next payout: {formatDate(balance.nextPayoutAt)}
+          </Text>
+        )}
+        <Pressable
+          style={styles.payoutHistoryButton}
+          onPress={() => router.push("/payouts")}
+        >
+          <Text style={styles.payoutHistoryButtonText}>
+            View payout history
+          </Text>
+        </Pressable>
       </View>
 
       {/* Ledger list */}
@@ -238,7 +266,10 @@ export default function WalletScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
         }
         onEndReached={loadMore}
         onEndReachedThreshold={0.3}
@@ -248,7 +279,12 @@ export default function WalletScreen() {
           )
         }
         ListFooterComponent={
-          loadingMore ? <ActivityIndicator size="small" color="#0a7ea4" /> : null
+          loadingMore ? (
+            <ActivityIndicator
+              size="small"
+              color="#0a7ea4"
+            />
+          ) : null
         }
         contentContainerStyle={styles.listContent}
       />
@@ -264,11 +300,37 @@ const styles = StyleSheet.create({
     padding: 24,
     marginBottom: 16,
   },
-  balanceLabel: { color: "rgba(255,255,255,0.8)", fontSize: 14, marginBottom: 4 },
+  balanceLabel: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 14,
+    marginBottom: 4,
+  },
   balanceAmount: { color: "#fff", fontSize: 36, fontWeight: "700" },
   pendingText: { color: "rgba(255,255,255,0.9)", fontSize: 13, marginTop: 6 },
-  lastPayoutText: { color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 2 },
-  sectionTitle: { fontSize: 16, fontWeight: "600", paddingHorizontal: 16, paddingVertical: 8, color: "#11181C" },
+  lastPayoutText: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  payoutHistoryButton: {
+    marginTop: 12,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  payoutHistoryButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    color: "#11181C",
+  },
   listContent: { paddingHorizontal: 16, paddingBottom: 24 },
   ledgerRow: {
     flexDirection: "row",
@@ -284,5 +346,10 @@ const styles = StyleSheet.create({
   ledgerAmount: { fontSize: 15, fontWeight: "600" },
   credit: { color: "#1B8A2E" },
   debit: { color: "#C0392B" },
-  emptyText: { textAlign: "center", color: "#687076", marginTop: 40, fontSize: 15 },
+  emptyText: {
+    textAlign: "center",
+    color: "#687076",
+    marginTop: 40,
+    fontSize: 15,
+  },
 });
