@@ -24,16 +24,16 @@ App, Rider App)
 **Purpose**: Fare constants and enum validation before any service code is
 written
 
-- [ ] T001 Implement `calculateFare`, `splitFare`, and all fare constants
+- [x] T001 Implement `calculateFare`, `splitFare`, and all fare constants
       (`BASE_FARE_FJD`, `RATE_PER_KM_FJD`, `PLATFORM_COMMISSION_RATE`,
       `MERCHANT_SHARE_RATE`, `PAYOUT_SERVICE_FEE_FJD`) in
       `pkg/core/src/fareConstants.ts`
-- [ ] T002 Confirm `entryTypeEnum` in `pkg/db/schema/wallet.ts` has all required
+- [x] T002 Confirm `entryTypeEnum` in `pkg/db/schema/wallet.ts` has all required
       values: `trip_credit`, `commission`, `payout_debit`,
       `payout_service_fee_debit`
-- [ ] T003 Confirm `holderTypeEnum` in `pkg/db/schema/wallet.ts` has
+- [x] T003 Confirm `holderTypeEnum` in `pkg/db/schema/wallet.ts` has
       `individual`, `merchant`, `hakwa` values
-- [ ] T004 Ensure Hakwa platform wallet seed row (`holderId='hakwa'`,
+- [x] T004 Ensure Hakwa platform wallet seed row (`holderId='hakwa'`,
       `holderType='hakwa'`) exists — add to database seed script or migration
 
 ---
@@ -45,16 +45,16 @@ update can function
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Implement `getMerchantBalance` in `api/src/services/walletService.ts`
+- [x] T005 Implement `getMerchantBalance` in `api/src/services/walletService.ts`
       — query `SUM(amount) FROM ledgerEntry WHERE holderId = merchantId`; no
       mutable balance column
-- [ ] T006 [P] Implement `getLedgerPage` in `api/src/services/walletService.ts`
+- [x] T006 [P] Implement `getLedgerPage` in `api/src/services/walletService.ts`
       — cursor-based pagination of `ledgerEntry` rows for a given holder, sorted
       newest-first
-- [ ] T007 [P] Implement `notifyBalanceUpdated` in
+- [x] T007 [P] Implement `notifyBalanceUpdated` in
       `api/src/services/walletService.ts` — publish
       `wallet:updated:{merchantId}` event to Redis pub/sub after ledger insert
-- [ ] T008 Register merchant wallet routes in `api/src/index.ts` by mounting
+- [x] T008 Register merchant wallet routes in `api/src/index.ts` by mounting
       `api/src/routes/merchantWallet.ts`; register trip receipt routes in
       `api/src/routes/trips.ts`
 
@@ -73,16 +73,16 @@ credit + merchant credit) summing to the gross fare.
 exist with `entryType='commission'` (7%) and `entryType='trip_credit'` (93%);
 both share the same `tripId`; total equals gross fare.
 
-- [ ] T009 [US1] Update `completeTrip` transaction in
+- [x] T009 [US1] Update `completeTrip` transaction in
       `api/src/services/tripService.ts` — after transition to `completed`, call
       `calculateFare(actualDistanceKm)` from `@hakwa/core`, then
       `splitFare(fare)`, then atomically insert `commission` ledger entry for
       platform wallet and `trip_credit` entry for merchant wallet in same
       Drizzle transaction
-- [ ] T010 [US1] Validate rounding rule in `completeTrip`: merchant amount =
+- [x] T010 [US1] Validate rounding rule in `completeTrip`: merchant amount =
       `fare - platform` (never both independently rounded to avoid off-by-1-cent
       gap)
-- [ ] T011 [US1] After transaction commits, call
+- [x] T011 [US1] After transaction commits, call
       `notifyBalanceUpdated(merchantId)` to publish Redis event
 
 **Checkpoint**: User Story 1 complete — atomic fare split with two ledger
@@ -100,11 +100,11 @@ with breakdown using shared `calculateFare` from `@hakwa/core`.
 `calculateFare(distanceKm)` from `@hakwa/core`; same constants as trip
 completion.
 
-- [ ] T012 [US2] Update fare estimate worker in
+- [x] T012 [US2] Update fare estimate worker in
       `pkg/workers/src/workers/fareCalculation.ts` to import and use
       `calculateFare` from `pkg/core/src/fareConstants.ts` (ensures estimate
       uses same formula as completion)
-- [ ] T013 [P] [US2] Update `POST /api/bookings/fare-estimate` response in
+- [x] T013 [P] [US2] Update `POST /api/bookings/fare-estimate` response in
       `api/src/routes/bookings.ts` to include `baseFare` and `ratePerKm` fields
       from `@hakwa/core` constants
 
@@ -124,21 +124,21 @@ updates in real time after trip completion without manual refresh.
 `amount`, `label`, `tripId`, `createdAt`; a new trip completion updates balance
 via WebSocket without page reload.
 
-- [ ] T014 [US3] Implement `GET /api/merchant/wallet/balance` in
+- [x] T014 [US3] Implement `GET /api/merchant/wallet/balance` in
       `api/src/routes/merchantWallet.ts` — call `getMerchantBalance`, return
       `{ balance, currency, pendingPayoutAmount, lastPayoutAt }`
-- [ ] T015 [US3] Implement `GET /api/merchant/wallet/ledger` in
+- [x] T015 [US3] Implement `GET /api/merchant/wallet/ledger` in
       `api/src/routes/merchantWallet.ts` — call `getLedgerPage` with cursor +
       limit params, return paginated items with human-readable `label` per
       `entryType`
-- [ ] T016 [US3] Subscribe to `wallet:updated:{merchantId}` WebSocket channel in
+- [x] T016 [US3] Subscribe to `wallet:updated:{merchantId}` WebSocket channel in
       `api/src/websocket.ts` — push `{ type: 'balance_updated' }` event to
       connected merchant client
-- [ ] T017 [P] [US3] Build `WalletScreen.tsx` in
+- [x] T017 [P] [US3] Build `WalletScreen.tsx` in
       `apps/mobile/merchant/src/screens/WalletScreen.tsx` — balance display,
       ledger FlatList with cursor pagination, real-time refresh on WebSocket
       `balance_updated` event using `@hakwa/api-client` hook
-- [ ] T018 [P] [US3] Build `WalletPage.tsx` in
+- [x] T018 [P] [US3] Build `WalletPage.tsx` in
       `apps/web/src/merchant/WalletPage.tsx` — equivalent wallet view for
       Merchant Web Portal
 
@@ -157,17 +157,17 @@ optionally request an emailed copy.
 `POST /api/trips/:tripId/receipt/email` enqueues to Redis Stream `emails:outbox`
 and returns `202 Accepted`.
 
-- [ ] T019 [US4] Implement `GET /api/trips/:tripId/receipt` in
+- [x] T019 [US4] Implement `GET /api/trips/:tripId/receipt` in
       `api/src/routes/trips.ts` — verify passenger ownership, return
       `{ pickup, destination, distanceKm, baseFare, totalFare, currency, completedAt, driverName }`
-- [ ] T020 [US4] Implement `POST /api/trips/:tripId/receipt/email` in
+- [x] T020 [US4] Implement `POST /api/trips/:tripId/receipt/email` in
       `api/src/routes/trips.ts` — verify ownership, push receipt payload to
       Redis Stream `emails:outbox` via `@hakwa/redis`, return `202 Accepted`
-- [ ] T021 [P] [US4] Update `TripSummaryScreen.tsx` in
+- [x] T021 [P] [US4] Update `TripSummaryScreen.tsx` in
       `apps/mobile/rider/src/screens/TripSummaryScreen.tsx` — display receipt
       details (pickup, destination, distance, fare breakdown) fetched from
       `GET /api/trips/:tripId/receipt`
-- [ ] T022 [P] [US4] Add "Email receipt" button in `TripSummaryScreen.tsx` and
+- [x] T022 [P] [US4] Add "Email receipt" button in `TripSummaryScreen.tsx` and
       `TripReceiptScreen.tsx` — calls `POST /api/trips/:tripId/receipt/email`,
       shows success/error toast
 
@@ -178,12 +178,12 @@ are functional
 
 ## Final Phase: Polish & Cross-Cutting Concerns
 
-- [ ] T023 [P] Validate `calculateFare` throws on `distanceKm <= 0` —
+- [x] T023 [P] Validate `calculateFare` throws on `distanceKm <= 0` —
       non-positive distance must not create a zero-fare ledger entry
-- [ ] T024 [P] Validate atomicity: simulate DB failure at ledger INSERT and
+- [x] T024 [P] Validate atomicity: simulate DB failure at ledger INSERT and
       confirm trip status rolls back to `in_progress` — no partial money
       movement
-- [ ] T025 [P] Confirm `GET /api/merchant/wallet/balance` returns
+- [x] T025 [P] Confirm `GET /api/merchant/wallet/balance` returns
       `403 ForbiddenError` if requesting user is not the merchant matching the
       wallet
 

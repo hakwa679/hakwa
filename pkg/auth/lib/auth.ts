@@ -6,15 +6,16 @@ import {
   NOTIFICATION_CHANNELS,
 } from "@hakwa/db/schema";
 import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { sendEmail } from "@hakwa/email";
+import { redis } from "@hakwa/redis";
 import { eq } from "drizzle-orm";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
 
 const auth = betterAuth({
   secret: process.env["BETTER_AUTH_SECRET"]!,
-  baseUrl: process.env["BETTER_AUTH_URL"]!,
+  baseURL: process.env["BETTER_AUTH_URL"]!,
   rateLimit: {
-    windowMs: 15 * 60 * 1000,
+    window: 15 * 60,
     max: 100,
     storage: "database",
   },
@@ -24,17 +25,9 @@ const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
-  },
-  emailVerification: {
-    sendVerificationEmail: async ({
-      user,
-      url,
-    }: {
-      user: { email: string };
-      url: string;
-    }) => {
+    sendVerificationEmail: async (email: string, url: string) => {
       await sendEmail({
-        to: user.email,
+        to: email,
         subject: "Verify your email",
         html: `<p>Please verify your email by clicking the following link: <a href="${url}">Click here</a></p>`,
       });
@@ -77,7 +70,10 @@ const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        after: async (newUser: { id: string }) => {
+        after: async (
+          newUser: { id: string },
+          context: { body?: Record<string, unknown> } | null,
+        ) => {
           // Seed 16 types × 4 channels = 64 notification preference rows
           const rows = NOTIFICATION_TYPES.flatMap((type) =>
             NOTIFICATION_CHANNELS.map((channel) => ({
@@ -91,6 +87,25 @@ const auth = betterAuth({
             .insert(notificationPreference)
             .values(rows)
             .onConflictDoNothing();
+
+          const maybeReferralCode = context?.body?.["referralCode"];
+          if (
+            typeof maybeReferralCode === "string" &&
+            maybeReferralCode.trim().length > 0
+          ) {
+            await redis.xadd(
+              "gamification:events",
+              "*",
+              "type",
+              "referral_used",
+              "userId",
+              newUser.id,
+              "referralCode",
+              maybeReferralCode.trim().toUpperCase(),
+              "timestamp",
+              new Date().toISOString(),
+            );
+          }
         },
       },
     },

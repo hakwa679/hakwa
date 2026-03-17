@@ -177,12 +177,12 @@ screen
 
 ## Final Phase: Polish & Cross-Cutting Concerns
 
-- [ ] T022 [P] Idempotency test: trigger batch creation twice for same
+- [x] T022 [P] Idempotency test: trigger batch creation twice for same
       `weekStart` and confirm only one `payoutBatch` row exists in database
-- [ ] T023 [P] Validate merchant cannot view other merchants' payouts —
+- [x] T023 [P] Validate merchant cannot view other merchants' payouts —
       `GET /api/merchant/payouts` must filter by
       `merchantId = session.merchantId`
-- [ ] T024 [P] Validate batch processes zero-balance merchants correctly — no
+- [x] T024 [P] Validate batch processes zero-balance merchants correctly — no
       payout row created, no ledger entries, batch still reaches `completed`
 
 ---

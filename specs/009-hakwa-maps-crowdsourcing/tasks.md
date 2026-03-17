@@ -86,10 +86,10 @@ order or in parallel by team.
 
 ### Official Documentation Gate (Required Before Each Story Phase)
 
-- [ ] Confirm relevant framework/library docs were reviewed and version-checked.
-- [ ] Record any behavior assumptions and API compatibility notes in
+- [x] Confirm relevant framework/library docs were reviewed and version-checked.
+- [x] Record any behavior assumptions and API compatibility notes in
       `research.md`.
-- [ ] Re-validate endpoint and schema decisions against the latest official
+- [x] Re-validate endpoint and schema decisions against the latest official
       docs.
 
 ---

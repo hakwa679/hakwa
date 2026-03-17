@@ -9,6 +9,6 @@
     "dependencies": {
         "@hakwa/db": "*",
         "@hakwa/email": "*",
-        "better-auth": "latest"
+        "better-auth": "^1.5.5"
     }
 }

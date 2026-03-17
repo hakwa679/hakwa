@@ -92,7 +92,7 @@ event; in-app notification delivered.
 - [x] T012 [P] [US1] Implement `GET /api/me/gamification` in
       `api/src/routes/meGamification.ts` — return
       `{ totalPoints, currentLevel, nextLevel, pointsToNext, referralCode, badges, currentStreak }`
-- [ ] T013 [P] [US1] Build `GamificationProfileCard` in
+- [x] T013 [P] [US1] Build `GamificationProfileCard` in
       `apps/mobile/rider/src/components/GamificationProfileCard.tsx` — shows
       total points, level name, level icon, and progress bar to next level
 
@@ -112,21 +112,21 @@ notification
 trip → referrer gets 100-pt `referral_trip` ledger entry; sign up as 21st
 referee → referral record created but no points awarded.
 
-- [ ] T014 [US2] Accept optional `referralCode` on `POST /auth/sign-up/email` in
+- [x] T014 [US2] Accept optional `referralCode` on `POST /auth/sign-up/email` in
       `pkg/auth/lib/auth.ts` — after account creation, if code provided, look up
       `pointsAccount.referralCode`, create `referral` row (UNIQUE on
       `refereeId`), publish `referral_used` event to `gamification:events`
-- [ ] T015 [US2] Implement `handleReferralUsed` in `gamificationProcessor.ts` —
+- [x] T015 [US2] Implement `handleReferralUsed` in `gamificationProcessor.ts` —
       award `referral_signup` points to referrer if
       `referrerReferralCount < MAX_REFERRAL_REWARDS`; notify referrer of
       cap-reached if limit hit
-- [ ] T016 [US2] Publish `first_trip_completed` event to `gamification:events`
+- [x] T016 [US2] Publish `first_trip_completed` event to `gamification:events`
       in `tripService.ts` when a user's `pointsLedger` has no prior
       `trip_completed` entries (first trip detection)
-- [ ] T017 [US2] Implement `handleFirstTripCompleted` in
+- [x] T017 [US2] Implement `handleFirstTripCompleted` in
       `gamificationProcessor.ts` — look up active `referral` for referee, award
       `referral_trip` points (100) to referrer if under cap
-- [ ] T018 [P] [US2] Display referral code and referral count on
+- [x] T018 [P] [US2] Display referral code and referral count on
       `GamificationProfileCard` in
       `apps/mobile/rider/src/components/GamificationProfileCard.tsx`
 
@@ -146,14 +146,14 @@ computed from
 when `totalPoints` crosses next level threshold, `level_up` notification is
 sent.
 
-- [ ] T019 [US3] Implement level computation in `gamificationProcessor.ts` —
+- [x] T019 [US3] Implement level computation in `gamificationProcessor.ts` —
       after every points award, query `level` table for new level; if
       `newLevel.number > previousLevel.number`, publish `level_up` event and
       send `@hakwa/notifications` push
-- [ ] T020 [US3] Update `GET /api/me/gamification` to include
+- [x] T020 [US3] Update `GET /api/me/gamification` to include
       `{ currentLevel: { number, name, iconUrl }, nextLevel: { name, minPoints }, progressPercent }`
       in `api/src/routes/meGamification.ts`
-- [ ] T021 [P] [US3] Build level progress bar in `GamificationProfileCard.tsx` —
+- [x] T021 [P] [US3] Build level progress bar in `GamificationProfileCard.tsx` —
       animated fill from `progressPercent`; show level-up celebration animation
       on `level_up` WebSocket event
 
@@ -172,14 +172,14 @@ notification sent once.
 `first_trip` created; second trip event → no duplicate row;
 `GET /api/me/gamification` includes badge in `badges` array.
 
-- [ ] T022 [US4] Implement `evaluateBadges` in `gamificationProcessor.ts` — load
+- [x] T022 [US4] Implement `evaluateBadges` in `gamificationProcessor.ts` — load
       `badge` table, evaluate each badge's `criteria` JSONB against user's
       current stats; for each earned badge:
       `INSERT INTO userBadge ON CONFLICT (userId, badgeId) DO NOTHING`; only
       notify if newly inserted (use rowCount check)
-- [ ] T023 [US4] Award `badge_earned` points entry from `badge.bonusPoints` on
+- [x] T023 [US4] Award `badge_earned` points entry from `badge.bonusPoints` on
       first-time badge award in `evaluateBadges`
-- [ ] T024 [P] [US4] Display badge grid on profile in
+- [x] T024 [P] [US4] Display badge grid on profile in
       `apps/mobile/rider/src/screens/ProfileScreen.tsx` — badge icons with
       earned/locked states from `GET /api/me/gamification`
 
@@ -197,14 +197,14 @@ resets to 0; 7-day and 30-day milestones award bonus points.
 no trip day 3 → streak = 0; reach day 7 → `streak_milestone_7` ledger entry (25
 pts) inserted.
 
-- [ ] T025 [US5] Implement `updateStreak` in `gamificationProcessor.ts` —
+- [x] T025 [US5] Implement `updateStreak` in `gamificationProcessor.ts` —
       compare last `streakCheckpoint.checkpointDate` with today (Fiji local date
       UTC+12); if same day = no-op; if previous day = increment `currentStreak`;
       if older = reset to 1; check milestones (7, 30) and insert bonus ledger
       entry if reached
-- [ ] T026 [US5] Update `GET /api/me/gamification` to include `currentStreak`
+- [x] T026 [US5] Update `GET /api/me/gamification` to include `currentStreak`
       and `streakMilestones` in `api/src/routes/meGamification.ts`
-- [ ] T027 [P] [US5] Display streak flame counter on
+- [x] T027 [P] [US5] Display streak flame counter on
       `GamificationProfileCard.tsx` — current streak count with flame icon from
       `@hakwa/ui-native`
 
@@ -223,16 +223,16 @@ Monday.
 called after trip points; `GET /api/gamification/leaderboard` returns top 20
 users with name and points; Sorted Set expires at end of week.
 
-- [ ] T028 [US6] Implement leaderboard update in `handleTripCompleted` in
+- [x] T028 [US6] Implement leaderboard update in `handleTripCompleted` in
       `gamificationProcessor.ts` —
       `ZADD leaderboard:weekly:{weekKey} INCR {points} {userId}` where
       `weekKey = ISO-week string`; set `EXPIREAT` to next Monday midnight Fiji
       time
-- [ ] T029 [US6] Implement `GET /api/gamification/leaderboard` in
+- [x] T029 [US6] Implement `GET /api/gamification/leaderboard` in
       `api/src/routes/leaderboard.ts` —
       `ZREVRANGE leaderboard:weekly:{weekKey} 0 19 WITHSCORES`; enrich with user
       names from DB; return top 20
-- [ ] T030 [P] [US6] Build `LeaderboardScreen.tsx` in
+- [x] T030 [P] [US6] Build `LeaderboardScreen.tsx` in
       `apps/mobile/rider/src/screens/LeaderboardScreen.tsx` — ranked list with
       position, name, and weekly points; highlight current user's row
 
@@ -243,14 +243,14 @@ is functional
 
 ## Final Phase: Polish & Cross-Cutting Concerns
 
-- [ ] T031 [P] Implement `GET /api/me/gamification/history` in
+- [x] T031 [P] Implement `GET /api/me/gamification/history` in
       `api/src/routes/meGamification.ts` — paginated `pointsLedger` entries
       newest-first with source action label and reference
-- [ ] T032 [P] Validate gamification failures do not affect trip completion —
+- [x] T032 [P] Validate gamification failures do not affect trip completion —
       wrap all gamification processing in try/catch in
       `gamificationProcessor.ts`; log errors but do not re-throw to stream
       consumer
-- [ ] T033 [P] Referral code generation — on `pointsAccount` creation use
+- [x] T033 [P] Referral code generation — on `pointsAccount` creation use
       `nanoid(12)` to generate unique `referralCode`; retry on collision (rare)
 
 ---

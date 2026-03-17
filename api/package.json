@@ -20,15 +20,15 @@
     "@hakwa/email": "*",
     "@hakwa/notifications": "*",
     "@hakwa/redis": "*",
-    "dotenv": "latest",
-    "express": "latest",
-    "node-cron": "latest",
-    "ws": "latest"
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "node-cron": "^3.0.2",
+    "ws": "^8.13.0"
   },
   "devDependencies": {
-    "@types/express": "latest",
-    "@types/node-cron": "latest",
-    "@types/ws": "latest",
-    "tsx": "latest"
+    "@types/express": "^5.0.6",
+    "@types/node-cron": "^2.0.3",
+    "@types/ws": "^8.5.4",
+    "tsx": "^3.12.7"
   }
 }

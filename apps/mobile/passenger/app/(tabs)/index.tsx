@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import * as SecureStore from "expo-secure-store";
+import { GamificationProfileCard } from "../../src/components/GamificationProfileCard";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -33,6 +34,10 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>Passenger Home</Text>
       <Text style={styles.subtitle}>You are signed in.</Text>
+      <GamificationProfileCard
+        onPressLeaderboard={() => router.push("/leaderboard" as never)}
+        onPressProfile={() => router.push("/profile" as never)}
+      />
       <Pressable
         style={styles.signOutBtn}
         onPress={confirmSignOut}
@@ -59,13 +64,14 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: "#687076",
-    marginBottom: 40,
+    marginBottom: 20,
   },
   signOutBtn: {
     backgroundColor: "#d9534f",
     borderRadius: 8,
     paddingVertical: 14,
     paddingHorizontal: 32,
+    marginTop: 20,
   },
   signOutText: {
     color: "#fff",

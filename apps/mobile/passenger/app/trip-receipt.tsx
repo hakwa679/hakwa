@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,20 +16,16 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 interface TripDetails {
   tripId: string;
-  status: string;
+  status?: string;
   pickupAddress: string | null;
-  destinationAddress: string | null;
-  estimatedFare: string | null;
-  estimatedDistanceKm: string | null;
+  dropoffAddress: string | null;
+  totalFare: string | null;
+  baseFare: string | null;
+  ratePerKm: string | null;
   actualDistanceKm: string | null;
-  cancellationReason: string | null;
+  currency: string;
   completedAt: string | null;
-  cancelledAt: string | null;
-  createdAt: string | null;
-  driver?: {
-    id?: string;
-    name?: string;
-  } | null;
+  driverName?: string | null;
 }
 
 export default function TripReceiptScreen() {
@@ -37,13 +34,14 @@ export default function TripReceiptScreen() {
   const [trip, setTrip] = useState<TripDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [emailing, setEmailing] = useState(false);
 
   useEffect(() => {
     if (!tripId) return;
     (async () => {
       try {
-        const token = await SecureStore.getItemAsync("session_token");
-        const res = await fetch(`${API_URL}/api/bookings/${tripId}`, {
+        const token = await SecureStore.getItemAsync("hakwa_token");
+        const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error("Could not load receipt");
@@ -83,15 +81,15 @@ export default function TripReceiptScreen() {
     );
   }
 
-  const distanceKm = trip.actualDistanceKm ?? trip.estimatedDistanceKm;
+  const distanceKm = trip.actualDistanceKm;
   const distanceNum = distanceKm ? parseFloat(distanceKm) : null;
-  const fareNum = trip.estimatedFare ? parseFloat(trip.estimatedFare) : null;
+  const fareNum = trip.totalFare ? parseFloat(trip.totalFare) : null;
 
-  const baseFare = 2.5;
+  const baseFare = parseFloat(trip.baseFare ?? "2.50");
   const distanceFare =
     distanceNum != null ? Math.max(0, fareNum! - baseFare) : 0;
 
-  const endedAt = trip.completedAt ?? trip.cancelledAt ?? trip.createdAt;
+  const endedAt = trip.completedAt;
   const formatDate = (iso: string | null) => {
     if (!iso) return "—";
     return new Date(iso).toLocaleDateString(undefined, {
@@ -101,6 +99,33 @@ export default function TripReceiptScreen() {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const onEmailReceipt = async () => {
+    if (!tripId || emailing) return;
+    setEmailing(true);
+    try {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt/email`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        Alert.alert(
+          "Receipt",
+          "Could not queue receipt email. Please try again.",
+        );
+        return;
+      }
+      Alert.alert("Receipt", "Your receipt email has been queued.");
+    } catch {
+      Alert.alert(
+        "Receipt",
+        "Could not queue receipt email. Please try again.",
+      );
+    } finally {
+      setEmailing(false);
+    }
   };
 
   return (
@@ -115,12 +140,14 @@ export default function TripReceiptScreen() {
         <View
           style={[
             styles.statusChip,
-            trip.status === "completed"
+            (trip.status ?? "completed") === "completed"
               ? styles.statusCompleted
               : styles.statusCancelled,
           ]}
         >
-          <Text style={styles.statusChipText}>{trip.status.toUpperCase()}</Text>
+          <Text style={styles.statusChipText}>
+            {(trip.status ?? "completed").toUpperCase()}
+          </Text>
         </View>
       </View>
 
@@ -143,25 +170,21 @@ export default function TripReceiptScreen() {
             style={styles.addressText}
             numberOfLines={2}
           >
-            {trip.destinationAddress ?? "Destination"}
+            {trip.dropoffAddress ?? "Destination"}
           </Text>
         </View>
         {distanceNum != null && (
           <Text style={styles.distanceText}>
-            Distance:{" "}
-            {trip.actualDistanceKm
-              ? parseFloat(trip.actualDistanceKm).toFixed(2)
-              : parseFloat(trip.estimatedDistanceKm!).toFixed(2)}{" "}
-            km
+            Distance: {distanceNum.toFixed(2)} km
           </Text>
         )}
       </View>
 
       {/* Driver */}
-      {trip.driver?.name && (
+      {trip.driverName && (
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>Driver</Text>
-          <Text style={styles.driverName}>{trip.driver.name}</Text>
+          <Text style={styles.driverName}>{trip.driverName}</Text>
         </View>
       )}
 
@@ -172,17 +195,21 @@ export default function TripReceiptScreen() {
           baseFare={baseFare.toFixed(2)}
           distanceFare={distanceFare.toFixed(2)}
           distanceKm={(distanceNum ?? 0).toFixed(2)}
-          currency="FJD"
+          currency={trip.currency}
         />
       )}
 
-      {/* Cancellation reason */}
-      {trip.status === "cancelled" && trip.cancellationReason && (
-        <View style={[styles.card, styles.cancelCard]}>
-          <Text style={styles.sectionLabel}>Cancellation reason</Text>
-          <Text style={styles.cancelReason}>{trip.cancellationReason}</Text>
-        </View>
-      )}
+      <Pressable
+        style={[styles.emailBtn, emailing && styles.emailBtnDisabled]}
+        onPress={() => {
+          void onEmailReceipt();
+        }}
+        disabled={emailing}
+      >
+        <Text style={styles.emailBtnText}>
+          {emailing ? "Queueing..." : "Email receipt"}
+        </Text>
+      </Pressable>
 
       <Pressable
         style={styles.doneBtn}
@@ -226,7 +253,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 3,
   },
-  cancelCard: { borderLeftWidth: 3, borderLeftColor: "#EF5350" },
   sectionLabel: {
     fontSize: 12,
     fontWeight: "700",
@@ -265,7 +291,16 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   driverName: { fontSize: 16, fontWeight: "600", color: "#1A1A2E" },
-  cancelReason: { fontSize: 14, color: "#C62828" },
+  emailBtn: {
+    borderWidth: 1,
+    borderColor: "#6C63FF",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  emailBtnDisabled: { opacity: 0.6 },
+  emailBtnText: { color: "#6C63FF", fontWeight: "700", fontSize: 15 },
   loadingText: { color: "#888", marginTop: 8 },
   errorText: { fontSize: 15, color: "#C62828", textAlign: "center" },
   backBtn: {

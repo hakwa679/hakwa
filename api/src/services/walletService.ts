@@ -141,7 +141,6 @@ export async function getLedgerPage(
 // ---------------------------------------------------------------------------
 
 export interface BalanceUpdatedPayload {
-  balance: string;
   delta: string;
   entryType: EntryType;
   tripId: string | null;
@@ -151,10 +150,15 @@ export async function notifyBalanceUpdated(
   merchantId: string,
   payload: BalanceUpdatedPayload,
 ): Promise<void> {
+  const current = await getMerchantBalance(merchantId);
   const channel = `wallet:updated:${merchantId}`;
   await redis.publish(
     channel,
-    JSON.stringify({ type: "balance_updated", ...payload }),
+    JSON.stringify({
+      type: "balance_updated",
+      balance: current.balance,
+      ...payload,
+    }),
   );
 }
 

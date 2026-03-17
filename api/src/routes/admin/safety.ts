@@ -19,7 +19,8 @@ async function requireSafetyAdmin(
     return false;
   }
 
-  if (session.user.role !== "safety_admin" && session.user.role !== "admin") {
+  const role = (session.user as { role?: string }).role;
+  if (role !== "safety_admin" && role !== "admin") {
     res
       .status(403)
       .json({ code: "FORBIDDEN", message: "Safety admin required." });

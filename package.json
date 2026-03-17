@@ -16,7 +16,13 @@
         "passenger-dev": "npm start -w @hakwa/passenger",
         "merchant-dev": "npm start -w @hakwa/merchant",
         "driver-dev": "npm start -w @hakwa/driver",
-        "web-dev": "npm run dev -w @hakwa/web"
+        "web-dev": "npm run dev -w @hakwa/web",
+        "typecheck:root": "npx tsc --noEmit",
+        "typecheck:merchant": "npx tsc --noEmit -p apps/mobile/merchant/tsconfig.json",
+        "typecheck:passenger": "npx tsc --noEmit -p apps/mobile/passenger/tsconfig.json",
+        "typecheck:driver": "npx tsc --noEmit -p apps/mobile/driver/tsconfig.json",
+        "typecheck:web": "npx tsc --noEmit -p apps/web/tsconfig.app.json",
+        "typecheck": "npm run typecheck:root && npm run typecheck:merchant && npm run typecheck:passenger && npm run typecheck:driver && npm run typecheck:web"
     },
     "devDependencies": {
         "typescript": "^5.9.3"

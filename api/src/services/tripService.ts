@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import db from "@hakwa/db";
 import {
   trip,
@@ -6,6 +6,8 @@ import {
   wallet,
   operator,
   HolderType,
+  pointsAccount,
+  pointsLedger,
 } from "@hakwa/db/schema";
 import { calculateFare, splitFare } from "@hakwa/core";
 import { sendNotification } from "@hakwa/notifications";
@@ -132,6 +134,7 @@ export async function completeTrip(
   const merchantWallet = operatorRow
     ? await findOrCreateWallet(HolderType.MERCHANT, operatorRow.merchantId)
     : await findOrCreateWallet(HolderType.INDIVIDUAL, driverId);
+  await findOrCreateWallet(HolderType.HAKWA, "hakwa");
 
   const completedAt = new Date();
 
@@ -190,11 +193,36 @@ export async function completeTrip(
     completedAt.toISOString(),
   );
 
+  const [previousTripAwards] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(pointsLedger)
+    .innerJoin(pointsAccount, eq(pointsAccount.id, pointsLedger.accountId))
+    .where(
+      and(
+        eq(pointsAccount.userId, tripRow.passengerId),
+        eq(pointsLedger.sourceAction, "trip_completed"),
+      ),
+    );
+
+  if ((previousTripAwards?.count ?? 0) === 0) {
+    await redis.xadd(
+      "gamification:events",
+      "*",
+      "type",
+      "first_trip_completed",
+      "userId",
+      tripRow.passengerId,
+      "tripId",
+      tripId,
+      "timestamp",
+      completedAt.toISOString(),
+    );
+  }
+
   // T011: Notify merchant wallet balance updated via Redis pub/sub
   if (operatorRow) {
     // Fire-and-forget: balance push failure must not fail the trip completion
     notifyBalanceUpdated(operatorRow.merchantId, {
-      balance: driverEarnings.toFixed(2), // approximate; client should re-fetch
       delta: driverEarnings.toFixed(2),
       entryType: "trip_credit",
       tripId,

@@ -4,16 +4,19 @@ import {
   type Response,
   type NextFunction,
 } from "express";
-import { getSessionFromRequest } from "@hakwa/auth";
 import { requireRole } from "../middleware/requireRole.ts";
-import { getMerchantBalance, getLedgerPage } from "../services/walletService.ts";
+import { requireOwnMerchant } from "../middleware/requireOwnMerchant.ts";
+import {
+  getMerchantBalance,
+  getLedgerPage,
+} from "../services/walletService.ts";
 import { HolderType } from "@hakwa/db/schema";
-import { ForbiddenError } from "../services/merchantService.ts";
 
 export const merchantWalletRouter = Router();
 
 // All merchant wallet routes require the "merchant" role
 merchantWalletRouter.use(requireRole("merchant"));
+merchantWalletRouter.use(requireOwnMerchant);
 
 // ---------------------------------------------------------------------------
 // Auth helper — returns the authenticated merchant's user id
@@ -23,14 +26,17 @@ async function getMerchantId(
   req: Request,
   res: Response,
 ): Promise<string | null> {
-  const session = await getSessionFromRequest(req);
-  if (!session) {
+  const merchantRecord = (req as Request & { merchantRecord?: { id: string } })
+    .merchantRecord;
+
+  if (!merchantRecord) {
     res
       .status(401)
       .json({ code: "UNAUTHORIZED", message: "Authentication required." });
     return null;
   }
-  return session.user.id;
+
+  return merchantRecord.id;
 }
 
 // ---------------------------------------------------------------------------
@@ -42,18 +48,11 @@ async function getMerchantId(
 merchantWalletRouter.get(
   "/balance",
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const userId = await getMerchantId(req, res);
-    if (!userId) return;
-
-    // T025 — verify ownership: the authenticated user IS the merchant
-    const session = await getSessionFromRequest(req);
-    if (!session || session.user.id !== userId) {
-      next(new ForbiddenError("FORBIDDEN", "Access denied."));
-      return;
-    }
+    const merchantId = await getMerchantId(req, res);
+    if (!merchantId) return;
 
     try {
-      const balance = await getMerchantBalance(userId);
+      const balance = await getMerchantBalance(merchantId);
       res.json(balance);
     } catch (err) {
       next(err);
@@ -69,8 +68,8 @@ merchantWalletRouter.get(
 merchantWalletRouter.get(
   "/ledger",
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const userId = await getMerchantId(req, res);
-    if (!userId) return;
+    const merchantId = await getMerchantId(req, res);
+    if (!merchantId) return;
 
     const query = req.query as Record<string, string | undefined>;
     const cursor = query["cursor"];
@@ -78,7 +77,7 @@ merchantWalletRouter.get(
 
     try {
       const page = await getLedgerPage(
-        userId,
+        merchantId,
         HolderType.MERCHANT,
         cursor,
         limit,

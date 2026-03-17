@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { customAlphabet } from "nanoid";
 import { and, desc, eq, sql } from "drizzle-orm";
 import db from "@hakwa/db";
 import {
@@ -15,8 +16,11 @@ import {
   userBadge,
 } from "@hakwa/db/schema";
 import {
+  MAX_REFERRAL_REWARDS,
   MAP_POINTS_MAP_STREAK_7,
   POINTS_PER_TRIP,
+  REFERRAL_SIGNUP_POINTS,
+  REFERRAL_TRIP_POINTS,
   STREAK_BONUS_7,
   STREAK_BONUS_30,
   STREAK_MILESTONES,
@@ -81,7 +85,11 @@ function getFijiWeekKey(now: Date): string {
 }
 
 function buildReferralCode(): string {
-  return randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase();
+  const generateCode = customAlphabet(
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    12,
+  );
+  return generateCode();
 }
 
 async function ensurePointsAccount(userId: string) {
@@ -139,7 +147,64 @@ async function publishGamificationRealtime(
   );
 }
 
-async function computeAndNotifyLevel(userId: string): Promise<void> {
+function getWeeklyLeaderboardKey(now = new Date()): string {
+  return `leaderboard:weekly:${getFijiWeekKey(now)}`;
+}
+
+function getNextFijiMondayUtc(now = new Date()): Date {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Pacific/Fiji",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const parts = formatter.formatToParts(now);
+  const year = Number(parts.find((p) => p.type === "year")?.value ?? "1970");
+  const month = Number(parts.find((p) => p.type === "month")?.value ?? "01");
+  const day = Number(parts.find((p) => p.type === "day")?.value ?? "01");
+
+  const fijiDateUtc = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+  const dow = fijiDateUtc.getUTCDay();
+  const daysToNextMonday = dow === 0 ? 1 : 8 - dow;
+  fijiDateUtc.setUTCDate(fijiDateUtc.getUTCDate() + daysToNextMonday);
+
+  return new Date(fijiDateUtc.getTime() - 12 * 60 * 60 * 1000);
+}
+
+async function bumpWeeklyLeaderboard(
+  userId: string,
+  points: number,
+): Promise<void> {
+  const key = getWeeklyLeaderboardKey();
+  await redis.zincrby(key, points, userId);
+  const expireAt = Math.floor(getNextFijiMondayUtc().getTime() / 1000);
+  await redis.expireat(key, expireAt);
+}
+
+async function getLevelForPoints(
+  actor: "passenger" | "operator",
+  points: number,
+) {
+  const [row] = await db
+    .select()
+    .from(level)
+    .where(
+      and(
+        eq(level.applicableTo, actor),
+        sql`${level.pointsRequired} <= ${points}`,
+      ),
+    )
+    .orderBy(desc(level.pointsRequired))
+    .limit(1);
+
+  return row ?? null;
+}
+
+async function computeAndNotifyLevel(
+  userId: string,
+  previousPoints?: number,
+): Promise<void> {
   const account = await db
     .select()
     .from(pointsAccount)
@@ -148,33 +213,19 @@ async function computeAndNotifyLevel(userId: string): Promise<void> {
 
   if (!account[0]) return;
 
-  const currentLevel = await db
-    .select()
-    .from(level)
-    .where(
-      and(
-        eq(level.applicableTo, account[0].actor),
-        sql`${level.pointsRequired} <= ${account[0].totalPoints}`,
-      ),
-    )
-    .orderBy(desc(level.pointsRequired))
-    .limit(1);
+  const currentLevel = await getLevelForPoints(
+    account[0].actor,
+    account[0].totalPoints,
+  );
+  if (!currentLevel) return;
 
-  if (!currentLevel[0]) return;
+  const priorPoints =
+    typeof previousPoints === "number"
+      ? previousPoints
+      : Math.max(account[0].totalPoints - POINTS_PER_TRIP, 0);
+  const previousLevel = await getLevelForPoints(account[0].actor, priorPoints);
 
-  const previousLevel = await db
-    .select()
-    .from(level)
-    .where(
-      and(
-        eq(level.applicableTo, account[0].actor),
-        sql`${level.pointsRequired} < ${currentLevel[0].pointsRequired}`,
-      ),
-    )
-    .orderBy(desc(level.pointsRequired))
-    .limit(1);
-
-  if ((previousLevel[0]?.levelNumber ?? 0) >= currentLevel[0].levelNumber) {
+  if ((previousLevel?.levelNumber ?? 0) >= currentLevel.levelNumber) {
     return;
   }
 
@@ -184,21 +235,21 @@ async function computeAndNotifyLevel(userId: string): Promise<void> {
     {
       channel: "in_app",
       title: "Level up!",
-      body: `You reached ${currentLevel[0].name}.`,
+      body: `You reached ${currentLevel.name}.`,
       data: {
-        number: currentLevel[0].levelNumber,
-        name: currentLevel[0].name,
+        number: currentLevel.levelNumber,
+        name: currentLevel.name,
       },
     },
-    `level_up:${userId}:${currentLevel[0].levelNumber}`,
+    `level_up:${userId}:${currentLevel.levelNumber}`,
   );
 
   await publishGamificationRealtime(userId, {
     event: "level_up",
     currentLevel: {
-      number: currentLevel[0].levelNumber,
-      name: currentLevel[0].name,
-      pointsRequired: currentLevel[0].pointsRequired,
+      number: currentLevel.levelNumber,
+      name: currentLevel.name,
+      pointsRequired: currentLevel.pointsRequired,
     },
     totalPoints: account[0].totalPoints,
   });
@@ -247,6 +298,24 @@ async function evaluateBadges(userId: string): Promise<void> {
       .returning({ badgeKey: userBadge.badgeKey });
 
     if (!inserted[0]) continue;
+
+    const bonusPoints = 10;
+    await db.transaction(async (tx) => {
+      await tx.insert(pointsLedger).values({
+        accountId: account.id,
+        amount: bonusPoints,
+        sourceAction: "badge_earned",
+        referenceId: `badge:${b.key}`,
+      });
+
+      await tx
+        .update(pointsAccount)
+        .set({
+          totalPoints: sql`${pointsAccount.totalPoints} + ${bonusPoints}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(pointsAccount.id, account.id));
+    });
 
     await sendNotification(
       userId,
@@ -697,6 +766,7 @@ export async function handleTripCompleted(payload: {
   tripId?: string;
 }): Promise<void> {
   const account = await ensurePointsAccount(payload.userId);
+  const previousPoints = account.totalPoints;
 
   await db.transaction(async (tx) => {
     await tx.insert(pointsLedger).values({
@@ -745,9 +815,11 @@ export async function handleTripCompleted(payload: {
     tripId: payload.tripId,
   });
 
+  await bumpWeeklyLeaderboard(payload.userId, POINTS_PER_TRIP);
+
   await updateStreak(payload.userId);
   await evaluateBadges(payload.userId);
-  await computeAndNotifyLevel(payload.userId);
+  await computeAndNotifyLevel(payload.userId, previousPoints);
 }
 
 async function handleUserRegistered(payload: {
@@ -756,18 +828,209 @@ async function handleUserRegistered(payload: {
   await ensurePointsAccount(payload.userId);
 }
 
-async function handleFirstTripCompleted(_payload: {
+async function handleFirstTripCompleted(payload: {
   userId: string;
   tripId?: string;
 }): Promise<void> {
-  // Referral first-trip rewards are added in a later implementation slice.
+  const [activeReferral] = await db
+    .select({
+      id: referral.id,
+      referrerId: referral.referrerId,
+      firstTripBonusLedgerId: referral.firstTripBonusLedgerId,
+    })
+    .from(referral)
+    .where(eq(referral.refereeId, payload.userId))
+    .limit(1);
+
+  if (!activeReferral || activeReferral.firstTripBonusLedgerId) {
+    return;
+  }
+
+  const [awardedCountRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(referral)
+    .where(
+      and(
+        eq(referral.referrerId, activeReferral.referrerId),
+        sql`${referral.firstTripBonusLedgerId} IS NOT NULL`,
+      ),
+    );
+
+  if ((awardedCountRow?.count ?? 0) >= MAX_REFERRAL_REWARDS) {
+    return;
+  }
+
+  const referrerAccount = await ensurePointsAccount(activeReferral.referrerId);
+  const referenceId = `referral:${activeReferral.id}:first_trip`;
+
+  const [insertedLedger] = await db
+    .insert(pointsLedger)
+    .values({
+      accountId: referrerAccount.id,
+      amount: REFERRAL_TRIP_POINTS,
+      sourceAction: "referral_trip",
+      referenceId,
+    })
+    .onConflictDoNothing()
+    .returning({ id: pointsLedger.id });
+
+  if (!insertedLedger) return;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(pointsAccount)
+      .set({
+        totalPoints: sql`${pointsAccount.totalPoints} + ${REFERRAL_TRIP_POINTS}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(pointsAccount.id, referrerAccount.id));
+
+    await tx
+      .update(referral)
+      .set({ firstTripBonusLedgerId: insertedLedger.id })
+      .where(eq(referral.id, activeReferral.id));
+  });
+
+  await sendNotification(
+    activeReferral.referrerId,
+    "system_alert",
+    {
+      channel: "in_app",
+      title: "Referral reward unlocked",
+      body: `You earned ${REFERRAL_TRIP_POINTS} points from your referral's first trip.`,
+      data: {
+        sourceAction: "referral_trip",
+        points: REFERRAL_TRIP_POINTS,
+      },
+    },
+    `referral_trip:${activeReferral.id}`,
+  );
+
+  await publishGamificationRealtime(activeReferral.referrerId, {
+    event: "points_awarded",
+    sourceAction: "referral_trip",
+    points: REFERRAL_TRIP_POINTS,
+    totalPoints: referrerAccount.totalPoints + REFERRAL_TRIP_POINTS,
+  });
+
+  await evaluateBadges(activeReferral.referrerId);
+  await computeAndNotifyLevel(
+    activeReferral.referrerId,
+    referrerAccount.totalPoints,
+  );
 }
 
-async function handleReferralUsed(_payload: {
+async function handleReferralUsed(payload: {
   userId: string;
   referralCode?: string;
 }): Promise<void> {
-  // Referral reward/cap handling is added in a later implementation slice.
+  if (!payload.referralCode) return;
+
+  const [referrerAccount] = await db
+    .select({
+      id: pointsAccount.id,
+      userId: pointsAccount.userId,
+      totalPoints: pointsAccount.totalPoints,
+    })
+    .from(pointsAccount)
+    .where(eq(pointsAccount.referralCode, payload.referralCode))
+    .limit(1);
+
+  if (!referrerAccount || referrerAccount.userId === payload.userId) {
+    return;
+  }
+
+  const [createdReferral] = await db
+    .insert(referral)
+    .values({
+      referrerId: referrerAccount.userId,
+      refereeId: payload.userId,
+    })
+    .onConflictDoNothing()
+    .returning({ id: referral.id });
+
+  if (!createdReferral) return;
+
+  const [awardedCountRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(referral)
+    .where(
+      and(
+        eq(referral.referrerId, referrerAccount.userId),
+        sql`${referral.signupBonusLedgerId} IS NOT NULL`,
+      ),
+    );
+
+  if ((awardedCountRow?.count ?? 0) >= MAX_REFERRAL_REWARDS) {
+    await sendNotification(
+      referrerAccount.userId,
+      "system_alert",
+      {
+        channel: "in_app",
+        title: "Referral cap reached",
+        body: "You reached the maximum referral signup rewards for this phase.",
+        data: { maxReferralRewards: MAX_REFERRAL_REWARDS },
+      },
+      `referral_cap:${referrerAccount.userId}`,
+    );
+    return;
+  }
+
+  const [insertedLedger] = await db
+    .insert(pointsLedger)
+    .values({
+      accountId: referrerAccount.id,
+      amount: REFERRAL_SIGNUP_POINTS,
+      sourceAction: "referral_signup",
+      referenceId: `referral:${createdReferral.id}:signup`,
+    })
+    .onConflictDoNothing()
+    .returning({ id: pointsLedger.id });
+
+  if (!insertedLedger) return;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(pointsAccount)
+      .set({
+        totalPoints: sql`${pointsAccount.totalPoints} + ${REFERRAL_SIGNUP_POINTS}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(pointsAccount.id, referrerAccount.id));
+
+    await tx
+      .update(referral)
+      .set({ signupBonusLedgerId: insertedLedger.id })
+      .where(eq(referral.id, createdReferral.id));
+  });
+
+  await sendNotification(
+    referrerAccount.userId,
+    "system_alert",
+    {
+      channel: "in_app",
+      title: "Referral reward unlocked",
+      body: `You earned ${REFERRAL_SIGNUP_POINTS} points for a successful referral signup.`,
+      data: {
+        sourceAction: "referral_signup",
+        points: REFERRAL_SIGNUP_POINTS,
+      },
+    },
+    `referral_signup:${createdReferral.id}`,
+  );
+
+  await publishGamificationRealtime(referrerAccount.userId, {
+    event: "points_awarded",
+    sourceAction: "referral_signup",
+    points: REFERRAL_SIGNUP_POINTS,
+    totalPoints: referrerAccount.totalPoints + REFERRAL_SIGNUP_POINTS,
+  });
+
+  await evaluateBadges(referrerAccount.userId);
+  await computeAndNotifyLevel(
+    referrerAccount.userId,
+    referrerAccount.totalPoints,
+  );
 }
 
 function getMapLeaderboardKey(date = new Date()): string {
@@ -906,6 +1169,7 @@ async function handleMapPointsAwarded(eventPayload: {
   });
 
   await redis.zincrby(getMapLeaderboardKey(), points, eventPayload.userId);
+  await bumpWeeklyLeaderboard(eventPayload.userId, points);
   await updateMapStreakAndBonus(eventPayload.userId);
   await evaluateBadges(eventPayload.userId);
 
@@ -965,37 +1229,45 @@ function isMapPointsSourceAction(
 export async function processGamificationEvent(
   payload: GamificationEventPayload,
 ): Promise<void> {
-  switch (payload.type) {
-    case "trip_completed":
-      await handleTripCompleted(payload);
-      return;
-    case "user_registered":
-      await handleUserRegistered(payload);
-      return;
-    case "first_trip_completed":
-      await handleFirstTripCompleted(payload);
-      return;
-    case "referral_used":
-      await handleReferralUsed(payload);
-      return;
-    case "map_points_awarded":
-      await handleMapPointsAwarded({
-        userId: payload.userId,
-        ...(typeof payload.points === "number"
-          ? { points: payload.points }
-          : {}),
-        ...(isMapPointsSourceAction(payload.sourceAction)
-          ? { sourceAction: payload.sourceAction }
-          : {}),
-        ...(typeof payload.referenceId === "string"
-          ? { referenceId: payload.referenceId }
-          : {}),
-      });
-      return;
-    case "review_submitted":
-      await handleReviewSubmitted(payload);
-      return;
-    default:
-      throw new Error(`Unsupported gamification event: ${payload.type}`);
+  try {
+    switch (payload.type) {
+      case "trip_completed":
+        await handleTripCompleted(payload);
+        return;
+      case "user_registered":
+        await handleUserRegistered(payload);
+        return;
+      case "first_trip_completed":
+        await handleFirstTripCompleted(payload);
+        return;
+      case "referral_used":
+        await handleReferralUsed(payload);
+        return;
+      case "map_points_awarded":
+        await handleMapPointsAwarded({
+          userId: payload.userId,
+          ...(typeof payload.points === "number"
+            ? { points: payload.points }
+            : {}),
+          ...(isMapPointsSourceAction(payload.sourceAction)
+            ? { sourceAction: payload.sourceAction }
+            : {}),
+          ...(typeof payload.referenceId === "string"
+            ? { referenceId: payload.referenceId }
+            : {}),
+        });
+        return;
+      case "review_submitted":
+        await handleReviewSubmitted(payload);
+        return;
+      default:
+        return;
+    }
+  } catch (err) {
+    console.error("[gamificationProcessor] non-fatal processing error", {
+      type: payload.type,
+      userId: payload.userId,
+      err,
+    });
   }
 }

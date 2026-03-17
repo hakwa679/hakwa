@@ -2,6 +2,9 @@ import type { Server as HttpServer, IncomingMessage } from "http";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
 import { getSessionFromRequest } from "@hakwa/auth";
 import { redisSubscriber } from "@hakwa/redis";
+import db from "@hakwa/db";
+import { merchant } from "@hakwa/db/schema";
+import { eq } from "drizzle-orm";
 
 type Session = NonNullable<Awaited<ReturnType<typeof getSessionFromRequest>>>;
 type LiveWebSocket = WebSocket & { isAlive: boolean };
@@ -16,6 +19,7 @@ const userConnections = new Map<string, Set<LiveWebSocket>>();
  * Used for booking status/location fan-out.
  */
 const channelSubscriptions = new Map<string, Set<LiveWebSocket>>();
+const merchantUsers = new Map<string, Set<string>>();
 
 const markConnectionAlive = (ws: LiveWebSocket) => {
   ws.isAlive = true;
@@ -141,18 +145,37 @@ const handleConnection = (
       });
     }
 
-    // T016: For merchants, subscribe to their wallet:updated channel so
-    // real-time balance pushes are relayed after trip completion.
+    // T016: For merchants, subscribe to wallet updates keyed by merchant.id.
     if (userRole === "merchant") {
-      const walletChannel = `wallet:updated:${userId}`;
-      redisSubscriber.subscribe(walletChannel, (err) => {
-        if (err) {
-          console.error("[ws] redis subscribe error (wallet channel)", {
-            userId,
-            walletChannel,
-            err,
-          });
+      void (async () => {
+        const [merchantRow] = await db
+          .select({ id: merchant.id })
+          .from(merchant)
+          .where(eq(merchant.userId, userId))
+          .limit(1);
+
+        if (!merchantRow) return;
+
+        if (!merchantUsers.has(merchantRow.id)) {
+          merchantUsers.set(merchantRow.id, new Set());
         }
+        merchantUsers.get(merchantRow.id)!.add(userId);
+
+        const walletChannel = `wallet:updated:${merchantRow.id}`;
+        redisSubscriber.subscribe(walletChannel, (err) => {
+          if (err) {
+            console.error("[ws] redis subscribe error (wallet channel)", {
+              userId,
+              walletChannel,
+              err,
+            });
+          }
+        });
+      })().catch((err: unknown) => {
+        console.error("[ws] merchant wallet subscription lookup failed", {
+          userId,
+          err,
+        });
       });
     }
   }
@@ -266,6 +289,18 @@ const handleConnection = (
             });
           }
         });
+
+        // Cleanup merchant mapping and wallet channel subscription when no
+        // users remain for the merchant id.
+        for (const [merchantId, users] of merchantUsers) {
+          if (users.has(userId)) {
+            users.delete(userId);
+            if (users.size === 0) {
+              merchantUsers.delete(merchantId);
+              redisSubscriber.unsubscribe(`wallet:updated:${merchantId}`);
+            }
+          }
+        }
       }
     }
     console.log("[ws] connection closed", {
@@ -314,10 +349,14 @@ redisSubscriber.on("message", (channel: string, message: string) => {
   // 3. T016: wallet:updated:{merchantId} — push balance_updated to merchant client
   const walletMatch = /^wallet:updated:(.+)$/.exec(channel);
   if (walletMatch) {
-    const merchantUserId = walletMatch[1];
-    if (merchantUserId) {
-      const conns = userConnections.get(merchantUserId);
-      if (conns && conns.size > 0) {
+    const merchantId = walletMatch[1];
+    if (merchantId) {
+      const users = merchantUsers.get(merchantId);
+      if (!users || users.size === 0) return;
+
+      for (const userId of users) {
+        const conns = userConnections.get(userId);
+        if (!conns || conns.size === 0) continue;
         for (const ws of conns) {
           if (ws.readyState === ws.OPEN) {
             ws.send(message);
@@ -362,7 +401,10 @@ export const attachWebSocketServer = (httpServer: HttpServer) => {
     }
   }, HEARTBEAT_INTERVAL_MS);
 
-  heartbeatInterval.unref();
+  const heartbeatTimer = heartbeatInterval as unknown as {
+    unref?: () => void;
+  };
+  heartbeatTimer.unref?.();
 
   wss.on("connection", handleConnection);
 

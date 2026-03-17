@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -14,14 +15,15 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 interface TripDetails {
   tripId: string;
-  status: string;
-  driver?: { id?: string; name?: string } | null;
-  estimatedFare?: string | null;
-  estimatedDistanceKm?: string | null;
-  fare?: string | null;
   pickupAddress?: string | null;
-  destinationAddress?: string | null;
+  dropoffAddress?: string | null;
+  actualDistanceKm?: string | null;
+  baseFare?: string | null;
+  ratePerKm?: string | null;
+  totalFare?: string | null;
+  currency?: string;
   completedAt?: string | null;
+  driverName?: string | null;
 }
 
 /**
@@ -33,13 +35,14 @@ export default function TripSummaryScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const [trip, setTrip] = useState<TripDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [emailing, setEmailing] = useState(false);
 
   useEffect(() => {
     if (!tripId) return;
     (async () => {
       try {
         const token = await SecureStore.getItemAsync("hakwa_token");
-        const res = await fetch(`${API_URL}/api/bookings/${tripId}`, {
+        const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (res.ok) {
@@ -65,8 +68,38 @@ export default function TripSummaryScreen() {
     );
   }
 
-  const fare = trip?.fare ?? trip?.estimatedFare ?? "–";
-  const distanceKm = trip?.estimatedDistanceKm ?? "–";
+  const fare = trip?.totalFare ?? "0.00";
+  const distanceKm = trip?.actualDistanceKm ?? "0.00";
+
+  const onEmailReceipt = async () => {
+    if (!tripId || emailing) return;
+
+    setEmailing(true);
+    try {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt/email`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!res.ok) {
+        Alert.alert(
+          "Receipt",
+          "Could not queue receipt email. Please try again.",
+        );
+        return;
+      }
+
+      Alert.alert("Receipt", "Your receipt email has been queued.");
+    } catch {
+      Alert.alert(
+        "Receipt",
+        "Could not queue receipt email. Please try again.",
+      );
+    } finally {
+      setEmailing(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -77,23 +110,36 @@ export default function TripSummaryScreen() {
         <>
           <FareBreakdownCard
             estimatedFare={fare}
-            baseFare="2.50"
+            baseFare={trip?.baseFare ?? "2.50"}
             distanceFare={(parseFloat(fare) > 0
-              ? parseFloat(fare) - 2.5
+              ? parseFloat(fare) - parseFloat(trip?.baseFare ?? "2.50")
               : 0
             ).toFixed(2)}
             distanceKm={distanceKm}
+            currency={trip?.currency ?? "FJD"}
           />
 
-          {trip.driver?.name && (
-            <Text style={styles.driverLine}>Driver: {trip.driver.name}</Text>
+          {trip.driverName && (
+            <Text style={styles.driverLine}>Driver: {trip.driverName}</Text>
           )}
           {trip.pickupAddress && (
             <Text style={styles.addrLine}>From: {trip.pickupAddress}</Text>
           )}
-          {trip.destinationAddress && (
-            <Text style={styles.addrLine}>To: {trip.destinationAddress}</Text>
+          {trip.dropoffAddress && (
+            <Text style={styles.addrLine}>To: {trip.dropoffAddress}</Text>
           )}
+
+          <Pressable
+            style={[styles.emailBtn, emailing && styles.emailBtnDisabled]}
+            onPress={() => {
+              void onEmailReceipt();
+            }}
+            disabled={emailing}
+          >
+            <Text style={styles.emailBtnText}>
+              {emailing ? "Queueing..." : "Email receipt"}
+            </Text>
+          </Pressable>
         </>
       )}
 
@@ -114,6 +160,16 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 15, color: "#687076", marginBottom: 20 },
   driverLine: { fontSize: 15, color: "#11181C", marginTop: 12 },
   addrLine: { fontSize: 14, color: "#687076", marginTop: 4 },
+  emailBtn: {
+    marginTop: 18,
+    borderWidth: 1,
+    borderColor: "#0a7ea4",
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  emailBtnDisabled: { opacity: 0.6 },
+  emailBtnText: { color: "#0a7ea4", fontWeight: "700", fontSize: 14 },
   homeBtn: {
     backgroundColor: "#0a7ea4",
     borderRadius: 10,

@@ -92,7 +92,7 @@ export default function RootLayout() {
       } else if (path?.includes("reset-password")) {
         router.push({ pathname: "/auth/reset-password", params: { token } });
       } else {
-        routeNotificationPath(router, path);
+        routeNotificationPath(router, path ?? undefined);
       }
     } catch {
       // Ignore deep link errors

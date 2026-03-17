@@ -12,12 +12,14 @@
         "push": "drizzle-kit push"
     },
     "dependencies": {
-        "@neondatabase/serverless": "latest",
-        "dotenv": "latest",
-        "drizzle-orm": "latest"
+        "@neondatabase/serverless": "^1.0.2",
+        "dotenv": "^17.3.1",
+        "drizzle-orm": "^0.45.1",
+        "pg": "^8.20.0"
     },
     "devDependencies": {
-        "drizzle-kit": "latest",
-        "tsx": "latest"
+        "@types/pg": "^8.18.0",
+        "drizzle-kit": "^0.31.10",
+        "tsx": "^3.14.0"
     }
 }
