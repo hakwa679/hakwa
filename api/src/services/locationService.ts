@@ -2,6 +2,7 @@ import { and, eq, or } from "drizzle-orm";
 import db from "@hakwa/db";
 import { trip } from "@hakwa/db/schema";
 import { redis } from "@hakwa/redis";
+import { detectTripAnomalies } from "./safetyAnomalyService.ts";
 
 /** TTL in seconds for driver location hashes in Redis. */
 const DRIVER_LOCATION_TTL_SECONDS = 60;
@@ -66,5 +67,20 @@ export async function updateDriverLocation(
           err,
         });
       });
+
+    // Safety anomaly checks run on each in-progress telemetry update.
+    if (activeTripRow[0]) {
+      detectTripAnomalies({
+        tripId,
+        userId,
+        lat,
+        lng,
+      }).catch((error: unknown) => {
+        console.error("[location] safety anomaly check failed", {
+          tripId,
+          error,
+        });
+      });
+    }
   }
 }

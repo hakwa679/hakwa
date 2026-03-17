@@ -88,32 +88,32 @@ queues SMS, emits websocket event, and deduplicates repeats within 60 seconds.
 
 ### Tests for User Story 1
 
-- [ ] T019 [P] [US1] Add contract test for `POST /safety/sos` in
+- [x] T019 [P] [US1] Add contract test for `POST /safety/sos` in
       `api/tests/contract/safety.sos.contract.test.ts`
-- [ ] T020 [P] [US1] Add integration test for SOS creation + outbox enqueue in
+- [x] T020 [P] [US1] Add integration test for SOS creation + outbox enqueue in
       `api/tests/integration/safety.sos.integration.test.ts`
-- [ ] T021 [P] [US1] Add integration test for SOS dedup key TTL behavior in
+- [x] T021 [P] [US1] Add integration test for SOS dedup key TTL behavior in
       `api/tests/integration/safety.sos-dedup.integration.test.ts`
-- [ ] T022 [P] [US1] Add websocket event assertion test for
+- [x] T022 [P] [US1] Add websocket event assertion test for
       `safety.sos_triggered` in
       `api/tests/integration/safety.sos-websocket.integration.test.ts`
-- [ ] T091 [P] [US1] Add integration test for `safety.check_in_escalated` and
+- [x] T091 [P] [US1] Add integration test for `safety.check_in_escalated` and
       `safety.critical_incident` websocket emissions in
       `api/tests/integration/safety.events.integration.test.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T023 [US1] Implement `triggerSOS` domain flow in
+- [x] T023 [US1] Implement `triggerSOS` domain flow in
       `api/src/services/safetyService.ts`
-- [ ] T024 [P] [US1] Implement `POST /safety/sos` endpoint handler in
+- [x] T024 [P] [US1] Implement `POST /safety/sos` endpoint handler in
       `api/src/routes/safety.ts`
-- [ ] T025 [P] [US1] Implement Redis dedup key `safety:sos_dedup:<tripId>` with
+- [x] T025 [P] [US1] Implement Redis dedup key `safety:sos_dedup:<tripId>` with
       60s TTL in `api/src/services/safetyService.ts`
-- [ ] T026 [P] [US1] Implement rider long-press SOS countdown UI in
+- [x] T026 [P] [US1] Implement rider long-press SOS countdown UI in
       `apps/mobile/passenger/src/screens/ActiveTrip/SafetyPanel.tsx`
-- [ ] T027 [P] [US1] Implement rider silent SOS volume-button trigger hook in
+- [x] T027 [P] [US1] Implement rider silent SOS volume-button trigger hook in
       `apps/mobile/passenger/src/hooks/useSilentSOS.ts`
-- [ ] T028 [P] [US1] Implement driver SOS parity UI and silent trigger in
+- [x] T028 [P] [US1] Implement driver SOS parity UI and silent trigger in
       `apps/mobile/driver/src/screens/ActiveTrip/SafetyPanel.tsx`
 
 **Checkpoint**: US1 works independently with automated tests passing.
@@ -131,35 +131,35 @@ revoked/expired links return 410.
 
 ### Tests for User Story 2
 
-- [ ] T029 [P] [US2] Add contract tests for share create/revoke/public read
+- [x] T029 [P] [US2] Add contract tests for share create/revoke/public read
       endpoints in `api/tests/contract/safety.share.contract.test.ts`
-- [ ] T030 [P] [US2] Add integration test for token creation entropy and
+- [x] T030 [P] [US2] Add integration test for token creation entropy and
       active-share rotation in
       `api/tests/integration/safety.share-token.integration.test.ts`
-- [ ] T031 [P] [US2] Add integration test for `410 SAFETY_SHARE_EXPIRED`
+- [x] T031 [P] [US2] Add integration test for `410 SAFETY_SHARE_EXPIRED`
       lifecycle in
       `api/tests/integration/safety.share-expiry.integration.test.ts`
-- [ ] T032 [P] [US2] Add SSE integration test for location events and close
+- [x] T032 [P] [US2] Add SSE integration test for location events and close
       semantics in `api/tests/integration/safety.share-sse.integration.test.ts`
-- [ ] T033 [P] [US2] Add security test ensuring token not present in error
+- [x] T033 [P] [US2] Add security test ensuring token not present in error
       body/log payloads in
       `api/tests/integration/safety.share-security.integration.test.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T034 [US2] Implement create/revoke/share lookup service methods in
+- [x] T034 [US2] Implement create/revoke/share lookup service methods in
       `api/src/services/safetyShareService.ts`
-- [ ] T035 [P] [US2] Implement `POST /safety/trips/:tripId/share` in
+- [x] T035 [P] [US2] Implement `POST /safety/trips/:tripId/share` in
       `api/src/routes/safety.ts`
-- [ ] T036 [P] [US2] Implement `DELETE /safety/trips/:tripId/share` in
+- [x] T036 [P] [US2] Implement `DELETE /safety/trips/:tripId/share` in
       `api/src/routes/safety.ts`
-- [ ] T037 [P] [US2] Implement public `GET /safety/share/:token` response
+- [x] T037 [P] [US2] Implement public `GET /safety/share/:token` response
       shaping in `api/src/routes/safety.ts`
-- [ ] T038 [P] [US2] Implement `GET /safety/share/:token/stream` SSE endpoint in
+- [x] T038 [P] [US2] Implement `GET /safety/share/:token/stream` SSE endpoint in
       `api/src/routes/safety.ts`
-- [ ] T039 [P] [US2] Implement share expiry updater job in
+- [x] T039 [P] [US2] Implement share expiry updater job in
       `api/src/jobs/tripShareExpiry.ts`
-- [ ] T040 [P] [US2] Implement passenger app share/revoke UI actions in
+- [x] T040 [P] [US2] Implement passenger app share/revoke UI actions in
       `apps/mobile/passenger/src/screens/ActiveTrip/TripShareCard.tsx`
 
 **Checkpoint**: US2 is independently testable and deployable.
@@ -177,25 +177,25 @@ workflow.
 
 ### Tests for User Story 3
 
-- [ ] T041 [P] [US3] Add unit test for HMAC safety-code generation and date
+- [x] T041 [P] [US3] Add unit test for HMAC safety-code generation and date
       rotation in `core/src/safety/reference-code.test.ts`
-- [ ] T042 [P] [US3] Add contract tests for verify and wrong-vehicle endpoints
+- [x] T042 [P] [US3] Add contract tests for verify and wrong-vehicle endpoints
       in `api/tests/contract/safety.verify.contract.test.ts`
-- [ ] T043 [P] [US3] Add integration test for wrong-vehicle -> incident +
+- [x] T043 [P] [US3] Add integration test for wrong-vehicle -> incident +
       suspension transaction in
       `api/tests/integration/safety.wrong-vehicle.integration.test.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T044 [US3] Implement deterministic safety-code helper in
+- [x] T044 [US3] Implement deterministic safety-code helper in
       `core/src/safety/safety-code.ts`
-- [ ] T045 [P] [US3] Implement `GET /safety/trips/:tripId/verify` in
+- [x] T045 [P] [US3] Implement `GET /safety/trips/:tripId/verify` in
       `api/src/routes/safety.ts`
-- [ ] T046 [P] [US3] Implement `POST /safety/trips/:tripId/wrong-vehicle` in
+- [x] T046 [P] [US3] Implement `POST /safety/trips/:tripId/wrong-vehicle` in
       `api/src/routes/safety.ts`
-- [ ] T047 [P] [US3] Implement passenger verify-plate full-screen UI in
+- [x] T047 [P] [US3] Implement passenger verify-plate full-screen UI in
       `apps/mobile/passenger/src/screens/ActiveTrip/VehicleVerifyCard.tsx`
-- [ ] T048 [P] [US3] Implement driver mirrored safety-code display in
+- [x] T048 [P] [US3] Implement driver mirrored safety-code display in
       `apps/mobile/driver/src/screens/ActiveTrip/VehicleVerifyCard.tsx`
 
 **Checkpoint**: US3 complete with deterministic cross-app verification.
@@ -211,26 +211,26 @@ queues SMS and does not create incidents.
 
 ### Tests for User Story 4
 
-- [ ] T049 [P] [US4] Add contract tests for contacts CRUD and test-alert in
+- [x] T049 [P] [US4] Add contract tests for contacts CRUD and test-alert in
       `api/tests/contract/safety.contacts.contract.test.ts`
-- [ ] T050 [P] [US4] Add integration test for E.164 normalization and
+- [x] T050 [P] [US4] Add integration test for E.164 normalization and
       contact-limit enforcement in
       `api/tests/integration/safety.contacts.integration.test.ts`
-- [ ] T051 [P] [US4] Add integration test asserting test-alert does not insert
+- [x] T051 [P] [US4] Add integration test asserting test-alert does not insert
       `safetyIncident` in
       `api/tests/integration/safety.test-alert.integration.test.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T052 [US4] Implement contacts service (list/add/delete/test-alert) in
+- [x] T052 [US4] Implement contacts service (list/add/delete/test-alert) in
       `api/src/services/safetyContactsService.ts`
-- [ ] T053 [P] [US4] Implement `GET|POST|DELETE /safety/contacts*` routes in
+- [x] T053 [P] [US4] Implement `GET|POST|DELETE /safety/contacts*` routes in
       `api/src/routes/safety.ts`
-- [ ] T054 [P] [US4] Implement one-time onboarding nudge persistence logic in
+- [x] T054 [P] [US4] Implement one-time onboarding nudge persistence logic in
       `apps/mobile/passenger/src/screens/Settings/EmergencyContactsScreen.tsx`
-- [ ] T055 [P] [US4] Implement passenger emergency contacts management UI in
+- [x] T055 [P] [US4] Implement passenger emergency contacts management UI in
       `apps/mobile/passenger/src/screens/Settings/EmergencyContactsScreen.tsx`
-- [ ] T056 [P] [US4] Implement driver emergency contacts management UI in
+- [x] T056 [P] [US4] Implement driver emergency contacts management UI in
       `apps/mobile/driver/src/screens/Settings/EmergencyContactsScreen.tsx`
 
 **Checkpoint**: US4 complete; SOS recipients can be managed end-to-end.
@@ -247,30 +247,30 @@ window and escalates if unanswered.
 
 ### Tests for User Story 5
 
-- [ ] T057 [P] [US5] Add integration test for route-deviation threshold logic in
+- [x] T057 [P] [US5] Add integration test for route-deviation threshold logic in
       `api/tests/integration/safety.route-deviation.integration.test.ts`
-- [ ] T058 [P] [US5] Add integration test for prolonged-stop and speed anomalies
+- [x] T058 [P] [US5] Add integration test for prolonged-stop and speed anomalies
       in `api/tests/integration/safety.anomalies.integration.test.ts`
-- [ ] T059 [P] [US5] Add integration test for 20-minute anomaly cooldown key in
+- [x] T059 [P] [US5] Add integration test for 20-minute anomaly cooldown key in
       `api/tests/integration/safety.cooldown.integration.test.ts`
-- [ ] T060 [P] [US5] Add integration test for escalation at 90 seconds +
+- [x] T060 [P] [US5] Add integration test for escalation at 90 seconds +
       incident creation in
       `api/tests/integration/safety.checkin-escalation.integration.test.ts`
-- [ ] T061 [P] [US5] Add contract test for
+- [x] T061 [P] [US5] Add contract test for
       `POST /safety/check-ins/:checkInId/respond` in
       `api/tests/contract/safety.checkin-respond.contract.test.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T062 [US5] Implement anomaly detector service (route/stop/speed) in
+- [x] T062 [US5] Implement anomaly detector service (route/stop/speed) in
       `api/src/services/safetyAnomalyService.ts`
-- [ ] T063 [P] [US5] Integrate anomaly checks into telemetry flow in
+- [x] T063 [P] [US5] Integrate anomaly checks into telemetry flow in
       `api/src/services/locationService.ts`
-- [ ] T064 [P] [US5] Implement check-in creation/respond domain logic in
+- [x] T064 [P] [US5] Implement check-in creation/respond domain logic in
       `api/src/services/safetyCheckInService.ts`
-- [ ] T065 [P] [US5] Implement check-in response endpoint in
+- [x] T065 [P] [US5] Implement check-in response endpoint in
       `api/src/routes/safety.ts`
-- [ ] T066 [P] [US5] Implement passenger check-in prompt modal and countdown in
+- [x] T066 [P] [US5] Implement passenger check-in prompt modal and countdown in
       `apps/mobile/passenger/src/screens/ActiveTrip/SafetyCheckInModal.tsx`
 
 **Checkpoint**: US5 anomaly detection and escalation are fully functional.
@@ -287,32 +287,32 @@ creating incident; non-critical reports stay open without suspension.
 
 ### Tests for User Story 6
 
-- [ ] T067 [P] [US6] Add contract test for `POST /safety/incidents/report` in
+- [x] T067 [P] [US6] Add contract test for `POST /safety/incidents/report` in
       `api/tests/contract/safety.report.contract.test.ts`
-- [ ] T068 [P] [US6] Add integration test for critical-category transaction
+- [x] T068 [P] [US6] Add integration test for critical-category transaction
       semantics in
       `api/tests/integration/safety.report-critical.integration.test.ts`
-- [ ] T069 [P] [US6] Add integration test for non-critical report behavior in
+- [x] T069 [P] [US6] Add integration test for non-critical report behavior in
       `api/tests/integration/safety.report-noncritical.integration.test.ts`
-- [ ] T070 [P] [US6] Add integration test for evidence MIME and size validation
+- [x] T070 [P] [US6] Add integration test for evidence MIME and size validation
       in `api/tests/integration/safety.evidence.integration.test.ts`
-- [ ] T093 [P] [US6] Add integration test validating randomized evidence storage
+- [x] T093 [P] [US6] Add integration test validating randomized evidence storage
       key generation and raw filename stripping in
       `api/tests/integration/safety.evidence-storage.integration.test.ts`
 
 ### Implementation for User Story 6
 
-- [ ] T071 [US6] Implement incident report domain service with transaction
+- [x] T071 [US6] Implement incident report domain service with transaction
       boundaries in `api/src/services/safetyIncidentService.ts`
-- [ ] T072 [P] [US6] Implement `POST /safety/incidents/report` endpoint in
+- [x] T072 [P] [US6] Implement `POST /safety/incidents/report` endpoint in
       `api/src/routes/safety.ts`
-- [ ] T073 [P] [US6] Implement evidence upload request validation endpoint in
+- [x] T073 [P] [US6] Implement evidence upload request validation endpoint in
       `api/src/routes/safety.ts`
-- [ ] T092 [P] [US6] Implement non-guessable evidence storage key generation and
+- [x] T092 [P] [US6] Implement non-guessable evidence storage key generation and
       raw filename stripping in `api/src/services/safetyIncidentService.ts`
-- [ ] T074 [P] [US6] Implement safety report form UI in
+- [x] T074 [P] [US6] Implement safety report form UI in
       `apps/mobile/passenger/src/screens/SafetyReportScreen.tsx`
-- [ ] T075 [P] [US6] Implement reporter notification on incident resolution in
+- [x] T075 [P] [US6] Implement reporter notification on incident resolution in
       `api/src/services/safetyIncidentService.ts`
 
 **Checkpoint**: US6 reporting and critical handling pipeline complete.
@@ -328,20 +328,20 @@ incidents/check-ins with correct pagination and resolution mapping.
 
 ### Tests for User Story 7
 
-- [ ] T076 [P] [US7] Add contract test for `GET /safety/history` pagination in
+- [x] T076 [P] [US7] Add contract test for `GET /safety/history` pagination in
       `api/tests/contract/safety.history.contract.test.ts`
-- [ ] T077 [P] [US7] Add integration test for cross-user access isolation in
+- [x] T077 [P] [US7] Add integration test for cross-user access isolation in
       `api/tests/integration/safety.history-security.integration.test.ts`
 
 ### Implementation for User Story 7
 
-- [ ] T078 [US7] Implement history query and DTO mapping service in
+- [x] T078 [US7] Implement history query and DTO mapping service in
       `api/src/services/safetyHistoryService.ts`
-- [ ] T079 [P] [US7] Implement `GET /safety/history` endpoint in
+- [x] T079 [P] [US7] Implement `GET /safety/history` endpoint in
       `api/src/routes/safety.ts`
-- [ ] T080 [P] [US7] Implement safety history screen in
+- [x] T080 [P] [US7] Implement safety history screen in
       `apps/mobile/passenger/src/screens/SafetyHistoryScreen.tsx`
-- [ ] T081 [P] [US7] Implement safety history screen in
+- [x] T081 [P] [US7] Implement safety history screen in
       `apps/mobile/driver/src/screens/SafetyHistoryScreen.tsx`
 
 **Checkpoint**: US7 transparent history and follow-up workflow complete.
@@ -353,28 +353,28 @@ incidents/check-ins with correct pagination and resolution mapping.
 **Purpose**: Safety-team triage and resolution workflow for operational
 readiness.
 
-- [ ] T082 Implement `GET /admin/safety/incidents` queue endpoint in
+- [x] T082 Implement `GET /admin/safety/incidents` queue endpoint in
       `api/src/routes/admin/safety.ts`
-- [ ] T083 [P] Implement `PATCH /admin/safety/incidents/:id` resolution endpoint
+- [x] T083 [P] Implement `PATCH /admin/safety/incidents/:id` resolution endpoint
       in `api/src/routes/admin/safety.ts`
-- [ ] T084 [P] Add integration test for admin incident status transitions in
+- [x] T084 [P] Add integration test for admin incident status transitions in
       `api/tests/integration/safety.admin-queue.integration.test.ts`
 
 ---
 
 ## Final Phase: Polish and Cross-Cutting Concerns
 
-- [ ] T085 [P] Add rate limiting for SOS and test-alert endpoints in
+- [x] T085 [P] Add rate limiting for SOS and test-alert endpoints in
       `api/src/middleware/rateLimit.ts`
-- [ ] T086 [P] Add redaction guard for share tokens in request/error logging in
+- [x] T086 [P] Add redaction guard for share tokens in request/error logging in
       `api/src/middleware/requestLogger.ts`
-- [ ] T087 [P] Add end-to-end checklist alignment tests for success criteria
+- [x] T087 [P] Add end-to-end checklist alignment tests for success criteria
       SC-001..SC-008 in `api/tests/e2e/safety.success-criteria.e2e.test.ts`
-- [ ] T088 [P] Add latency/performance test for SOS and SSE timing budgets in
+- [x] T088 [P] Add latency/performance test for SOS and SSE timing budgets in
       `api/tests/perf/safety.latency.perf.test.ts`
-- [ ] T089 [P] Update feature runbook and operational alerts in
+- [x] T089 [P] Update feature runbook and operational alerts in
       `docs/runbooks/safety-system.md`
-- [ ] T090 Run quickstart verification scenarios and document observed outputs
+- [x] T090 Run quickstart verification scenarios and document observed outputs
       in `specs/010-safety-system/quickstart.md`
 
 ---

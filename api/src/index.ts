@@ -34,6 +34,8 @@ import { adminSafetyRouter } from "./routes/admin/safety.ts";
 import { startSafetySmsSender } from "./workers/smsSender.ts";
 import { startSafetyCheckInEscalationWorker } from "./workers/checkInEscalation.ts";
 import { validateSafetyEnvironment } from "./config/env.ts";
+import { registerTripShareExpiryCron } from "./jobs/tripShareExpiry.ts";
+import { requestLogger } from "./middleware/requestLogger.ts";
 
 const server = express();
 const httpServer = createServer(server);
@@ -44,6 +46,7 @@ validateSafetyEnvironment();
 // middleware
 server.use(express.json());
 server.use(express.urlencoded({ extended: true }));
+server.use(requestLogger);
 
 // Lockout check must be registered BEFORE the Better Auth wildcard handler
 server.post("/api/auth/sign-in/email", lockoutSignInMiddleware);
@@ -126,6 +129,7 @@ cron.schedule("0 21 * * *", () => {
 registerWeeklyPayoutCron();
 registerMapWeeklyMissionCron();
 registerMapLeaderboardRolloverCron();
+registerTripShareExpiryCron();
 
 // Start the server
 httpServer.listen(port, () => {

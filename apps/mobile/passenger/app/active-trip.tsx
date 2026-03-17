@@ -13,6 +13,8 @@ import {
   useBookingWebSocket,
   type TripStatus,
 } from "../hooks/useBookingWebSocket";
+import SafetyPanel from "../src/screens/ActiveTrip/SafetyPanel";
+import TripShareCard from "../src/screens/ActiveTrip/TripShareCard";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -176,6 +178,9 @@ export default function ActiveTripScreen() {
           <Text style={styles.cancelText}>Cancel ride</Text>
         </Pressable>
       )}
+
+      <TripShareCard tripId={tripId ?? undefined} />
+      <SafetyPanel tripId={tripId ?? undefined} />
     </View>
   );
 }

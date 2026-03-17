@@ -7,3 +7,4 @@ export * from "./geometry/validate.ts";
 export * from "./geometry/rdp.ts";
 export * from "./safety/reference-code.ts";
 export * from "./safety/phone-normalize.ts";
+export * from "./safety/safety-code.ts";
