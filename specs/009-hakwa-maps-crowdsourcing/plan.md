@@ -124,6 +124,42 @@ row exists). Because the tier is derived, it can never be stale. A missing
 
 ---
 
+## Constitution Check
+
+- [x] **I. Package-First** — Map schema in `@hakwa/db`; constants and GeoJSON
+      validation in `@hakwa/core`; contribution UI components in
+      `@hakwa/ui-native`; offline queue in `@hakwa/api-client`.
+- [x] **II. Type Safety** — `mapFeature`, `mapZone`, `mapMission` types from
+      Drizzle `$inferSelect`; GeoJSON coordinate arrays validated at API
+      boundary with Zod.
+- [x] **III. Security** — All contribution endpoints require `requireAuth`;
+      content screener runs before insert; GPS velocity check prevents spoofed
+      locations; map ban enforced before any write.
+- [x] **IV. Schema Contract** — All 11+ map tables in `pkg/db/schema/map.ts`;
+      exported from `@hakwa/db`; `db-push` before any service code.
+- [x] **V. Real-Time** — `map:features:activated` Redis pub/sub on feature
+      activation; WebSocket relays to bounding-box subscribers; no polling.
+- [x] **VIII. Concurrency Safety** — Zone counter update uses atomic
+      `UPDATE … RETURNING` (additive increment); pioneer bonus gated on
+      `RETURNING current_feature_count = 1`; no race condition on parallel
+      activations.
+- [x] **IX. Webhook-First** — Post-commit gamification events dispatched to
+      `gamification:events` Redis Stream; no inline badge evaluation blocking
+      the HTTP response.
+- [x] **XIII. Shared-First Reuse** — Ramer–Douglas–Peucker simplification,
+      haversine distance, and content-screening logic in `@hakwa/core`; reused
+      by road-trace worker and validation service.
+- [x] **XVII. Mapping** — All map contribution UI via `@hakwa/map`; OSM tile URL
+      from env var; Nominatim for reverse geocoding submission context; no
+      Google Maps or Mapbox.
+- [x] **XVIII. Official Documentation First** — `react-native-maps` custom tile
+      URL option, Nominatim `/reverse` API, OSRM route shape, and AsyncStorage
+      queue pattern verified against official docs before implementation;
+      Ramer–Douglas–Peucker tolerance constants sourced from algorithm
+      specification, not prior-project memory.
+
+---
+
 ## Open Questions
 
 1. **Photo storage**: Where are contributor photos stored? (S3 / Cloudflare R2 /

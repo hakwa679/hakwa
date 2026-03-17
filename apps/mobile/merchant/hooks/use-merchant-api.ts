@@ -1,0 +1,170 @@
+import * as SecureStore from "expo-secure-store";
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const token = await SecureStore.getItemAsync("hakwa_token");
+  return token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+    : { "Content-Type": "application/json" };
+}
+
+// ---------------------------------------------------------------------------
+// Response types
+// ---------------------------------------------------------------------------
+
+export interface OnboardingSteps {
+  businessDetails: boolean;
+  bankAccount: boolean;
+  vehicle: boolean;
+}
+
+export interface MerchantProfile {
+  id: string;
+  userId: string;
+  name: string;
+  licenseType: "licensed" | "unlicensed";
+  status:
+    | "draft"
+    | "under_review"
+    | "approved"
+    | "rejected"
+    | "suspended_pending_review";
+  tin: string | null;
+  businessRegistrationNumber: string | null;
+  nationalId: string | null;
+  phone: string | null;
+  onboardingSteps: OnboardingSteps;
+}
+
+export interface BankAccountData {
+  id: string;
+  accountNumber: string;
+  accountHolderName: string;
+  bankName: string;
+  bankCode: string;
+  swiftCode: string;
+}
+
+export interface VehicleData {
+  id: string;
+  merchantId: string;
+  make: string;
+  model: string;
+  year: number;
+  registrationPlate: string;
+  seatingCapacity: number;
+  color: string | null;
+  isActive: boolean;
+}
+
+export interface ApiError {
+  code: string;
+  message: string;
+}
+
+// ---------------------------------------------------------------------------
+// API helpers
+// ---------------------------------------------------------------------------
+
+export async function fetchMerchantProfile(): Promise<MerchantProfile> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/merchants/me`, { headers });
+  if (!res.ok) {
+    const err = (await res.json()) as ApiError;
+    throw new Error(err.message ?? "Failed to load profile");
+  }
+  return res.json() as Promise<MerchantProfile>;
+}
+
+export async function updateMerchantProfile(
+  data: Partial<{
+    name: string;
+    tin: string;
+    businessRegistrationNumber: string;
+    nationalId: string;
+    phone: string;
+  }>,
+): Promise<MerchantProfile> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/merchants/me`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(data),
+  });
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok)
+    throw new Error((json["message"] as string) ?? "Failed to update profile");
+  return json as unknown as MerchantProfile;
+}
+
+export async function submitForReview(): Promise<{ status: string }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/merchants/me/submit`, {
+    method: "POST",
+    headers,
+  });
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok)
+    throw new Error((json["message"] as string) ?? "Failed to submit");
+  return json as { status: string };
+}
+
+export async function fetchBankAccount(): Promise<BankAccountData | null> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/merchants/me/bank-account`, {
+    headers,
+  });
+  if (!res.ok) return null;
+  const json = (await res.json()) as BankAccountData | null;
+  return json;
+}
+
+export async function upsertBankAccount(data: {
+  accountNumber: string;
+  accountHolderName: string;
+  bankName: string;
+  bankCode: string;
+  swiftCode: string;
+}): Promise<BankAccountData> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/merchants/me/bank-account`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(data),
+  });
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok)
+    throw new Error(
+      (json["message"] as string) ?? "Failed to save bank account",
+    );
+  return json as unknown as BankAccountData;
+}
+
+export async function fetchVehicles(): Promise<VehicleData[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/merchants/me/vehicles`, { headers });
+  const json = (await res.json()) as { vehicles: VehicleData[] };
+  if (!res.ok) return [];
+  return json.vehicles ?? [];
+}
+
+export async function addVehicle(data: {
+  make: string;
+  model: string;
+  year: number;
+  registrationPlate: string;
+  seatingCapacity: number;
+  color?: string;
+}): Promise<VehicleData> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/merchants/me/vehicles`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(data),
+  });
+  const json = (await res.json()) as Record<string, unknown>;
+  if (!res.ok)
+    throw new Error((json["message"] as string) ?? "Failed to add vehicle");
+  return json as unknown as VehicleData;
+}

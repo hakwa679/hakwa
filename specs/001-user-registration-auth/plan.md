@@ -1,7 +1,9 @@
 # Implementation Plan: User Registration & Authentication
 
-**Branch**: `001-user-registration-auth` | **Date**: 2026-03-17 | **Spec**: [spec.md](spec.md)  
-**Input**: Feature specification from `/specs/001-user-registration-auth/spec.md`
+**Branch**: `001-user-registration-auth` | **Date**: 2026-03-17 | **Spec**:
+[spec.md](spec.md)  
+**Input**: Feature specification from
+`/specs/001-user-registration-auth/spec.md`
 
 ---
 
@@ -19,13 +21,18 @@ Mobile session tokens are persisted in Expo SecureStore.
 ## Technical Context
 
 **Language/Version**: TypeScript 5.x (strict mode)  
-**Primary Dependencies**: `better-auth`, `@hakwa/auth`, `@hakwa/db` (Drizzle), `@hakwa/email`, `@hakwa/redis`, `@hakwa/errors`, `expo-secure-store`  
-**Storage**: PostgreSQL — `user`, `session`, `account`, `verification`, `user_profile` tables  
-**Testing**: Vitest + Supertest (API integration); Expo testing for mobile session restore  
-**Target Platform**: Node.js API server; React Native Expo (Rider/Driver/Merchant apps); React + Vite (web portals)  
+**Primary Dependencies**: `better-auth`, `@hakwa/auth`, `@hakwa/db` (Drizzle),
+`@hakwa/email`, `@hakwa/redis`, `@hakwa/errors`, `expo-secure-store`  
+**Storage**: PostgreSQL — `user`, `session`, `account`, `verification`,
+`user_profile` tables  
+**Testing**: Vitest + Supertest (API integration); Expo testing for mobile
+session restore  
+**Target Platform**: Node.js API server; React Native Expo
+(Rider/Driver/Merchant apps); React + Vite (web portals)  
 **Project Type**: Monorepo — Express API + five frontend apps  
 **Performance Goals**: Sign-in < 200ms p95; email delivery < 30 s  
-**Constraints**: Account enumeration must be impossible on forgot-password and resend flows; sessions must survive app restarts  
+**Constraints**: Account enumeration must be impossible on forgot-password and
+resend flows; sessions must survive app restarts  
 **Scale/Scope**: Phase 1 — up to 10k registered users; three role types
 
 ---
@@ -59,8 +66,9 @@ _Post-design gate — all principles evaluated against this feature's design._
 - [x] **XI. Unified Error Handling** — All auth errors wrapped as `AppError`
       subclasses; single Express error middleware handles responses; no stack
       traces in payloads.
-- [x] **XII. Frontend Architecture** — Session token stored via `@hakwa/api-
-      client` pattern; EXPO_PUBLIC_API_URL used for base URL; no hardcoded URLs.
+- [x] **XII. Frontend Architecture** — Session token stored via
+      `@hakwa/api-     client` pattern; EXPO_PUBLIC_API_URL used for base URL;
+      no hardcoded URLs.
 - [x] **XIII. Shared-First Reuse** — Auth utilities in `@hakwa/auth`; lockout
       constants in `@hakwa/core`; no duplication across apps.
 - [ ] **XIV. Notification System** — `email_verification` and `password_reset`
@@ -72,6 +80,9 @@ _Post-design gate — all principles evaluated against this feature's design._
       (loading/success/error) on all auth forms; error messages include recovery
       action; two-step confirmation not needed for registration.
 - [ ] **XVII. Mapping** — _Not applicable_: no map UI in auth flows.
+- [x] **XVIII. Official Documentation First** — Better Auth installation,
+      Drizzle adapter config, and Expo SecureStore API verified against official
+      docs before implementation; no memorised invocations used.
 
 ---
 

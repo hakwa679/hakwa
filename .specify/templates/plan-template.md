@@ -111,6 +111,13 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
       (Nominatim); routing via `@hakwa/map` `getRoute()` (OSRM/Valhalla);
       attribution rendered on every map view; no Google Maps or Mapbox
       references anywhere in this feature's code.
+- [ ] **XVIII. Official Documentation First** — every third-party package,
+      framework, service, or CLI used in this feature has had its official
+      online documentation consulted before any installation command,
+      scaffolding, API call, or configuration was written; version selection is
+      based on the current official release notes, not prior memory; any
+      conflict between official docs and this constitution is documented in the
+      violations section below.
 
 ## Project Structure
 

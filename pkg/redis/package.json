@@ -1,0 +1,15 @@
+{
+    "name": "@hakwa/redis",
+    "version": "0.0.1",
+    "type": "module",
+    "exports": {
+        ".": "./index.ts"
+    },
+    "types": "./index.ts",
+    "dependencies": {
+        "ioredis": "latest"
+    },
+    "devDependencies": {
+        "@types/node": "latest"
+    }
+}

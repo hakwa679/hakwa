@@ -40,21 +40,46 @@ export const wallet = pgTable("wallet", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+/**
+ * T004 — A Hakwa platform wallet seed row MUST exist:
+ *   holderId = 'hakwa', holderType = 'hakwa'
+ * The walletService's findOrCreateWallet('hakwa', 'hakwa') handles this
+ * automatically on first use.  For production seeds / migrations, insert:
+ *   INSERT INTO wallet (holder_type, holder_id) VALUES ('hakwa', 'hakwa')
+ *   ON CONFLICT DO NOTHING;
+ */
+
 export type Wallet = typeof wallet.$inferSelect;
 export type NewWallet = typeof wallet.$inferInsert;
 
-type LedgerEntryType = "credit" | "debit";
-type TransactionType = "ride_payment" | "payout" | "refund" | "adjustment";
+/**
+ * entry_type enum for ledger entries.
+ *
+ * - trip_credit          93 % merchant earnings from a completed trip
+ * - commission           7 % platform share from a completed trip
+ * - payout_debit         Amount swept in a weekly payout
+ * - payout_service_fee_debit  FJD 1.00 flat fee per payout
+ */
+export type EntryType =
+  | "trip_credit"
+  | "commission"
+  | "payout_debit"
+  | "payout_service_fee_debit";
+
 export const ledgerEntry = pgTable("ledger_entry", {
   id: uuid("id").primaryKey().defaultRandom(),
-  walletId: uuid("wallet_id")
-    .notNull()
-    .references(() => wallet.id, { onDelete: "cascade" }),
+  /** Wallet holder: merchant.id, user.id, or 'hakwa' for the platform. */
+  holderId: varchar("holder_id").notNull(),
+  holderType: varchar("holder_type").notNull().$type<HolderType>(),
+  entryType: varchar("entry_type").notNull().$type<EntryType>(),
+  /** Positive = credit, negative = debit. */
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
+  /** Link to trip.id for trip-related entries. */
+  tripId: uuid("trip_id"),
+  /** Link to payout.id for payout-related entries. */
+  payoutId: uuid("payout_id"),
   description: text("description"),
-  type: text("type").notNull().$type<LedgerEntryType>(),
-  transactionType: text("transaction_type").notNull().$type<TransactionType>(),
-  date: timestamp("date").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export type LedgerEntry = typeof ledgerEntry.$inferSelect;

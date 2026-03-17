@@ -7,6 +7,6 @@
     },
     "types": "./index.ts",
     "dependencies": {
-        "better-auth": "^1.5.5"
+        "better-auth": "latest"
     }
 }

@@ -53,7 +53,7 @@ Create `pkg/notifications/package.json`:
     "@hakwa/redis": "*",
     "@hakwa/email": "*",
     "@hakwa/errors": "*",
-    "expo-server-sdk": "^3.x"
+    "expo-server-sdk": "latest"
   }
 }
 ```

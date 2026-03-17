@@ -6,8 +6,8 @@ _Phase 0 output for `008-notification-system`_
 
 ## 1. Push Notification Delivery — Expo EPN (expo-server-sdk)
 
-**Decision**: Use `expo-server-sdk` (`@expo/server-sdk`) for all push
-notification delivery from the server.
+**Decision**: Use `expo-server-sdk` for all push notification delivery from the
+server.
 
 **Rationale**:
 

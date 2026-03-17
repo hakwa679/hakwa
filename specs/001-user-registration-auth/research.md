@@ -16,8 +16,8 @@ framework, integrated via `@hakwa/auth` package.
 - Provides email/password authentication with mandatory email verification
   out-of-the-box.
 - Handles session creation, token rotation, and sign-out natively.
-- Rate-limiting middleware configured at 100 requests per 15 minutes, stored
-  in the database — no additional Redis limiter needed for auth endpoints.
+- Rate-limiting middleware configured at 100 requests per 15 minutes, stored in
+  the database — no additional Redis limiter needed for auth endpoints.
 - `betterAuth.emailAndPassword.requireEmailVerification = true` enforces
   verified-email gate.
 
@@ -35,9 +35,8 @@ fields injected via Better Auth's `customSchema` hook.
 - _Auth.js (NextAuth)_: Next.js-centric; Express integration is community-
   maintained. Rejected — Better Auth has first-class Express support via
   `@hakwa/auth`'s `authHandler`.
-- _Custom JWT implementation_: Maximum control but substantial security
-  surface. Rejected — Better Auth is battle-tested against the same threat
-  model.
+- _Custom JWT implementation_: Maximum control but substantial security surface.
+  Rejected — Better Auth is battle-tested against the same threat model.
 
 ---
 
@@ -69,8 +68,8 @@ ALTER TABLE "user" ADD COLUMN role text NOT NULL DEFAULT 'passenger'
 
 **Alternatives considered**:
 
-- Separate user tables per role: maximally type-safe but duplicates auth
-  fields and complicates Better Auth integration. Rejected.
+- Separate user tables per role: maximally type-safe but duplicates auth fields
+  and complicates Better Auth integration. Rejected.
 - A single `role` column with no profile table: simple but couples onboarding
   state (merchant status, driver licence) to the auth record. Rejected.
 
@@ -92,13 +91,13 @@ flows, hooking into `@hakwa/email` for actual email delivery.
 
 **Security considerations**:
 
-- Password reset responses MUST NOT confirm whether an account exists
-  (prevents account enumeration). Better Auth returns a generic success
-  regardless of whether the email is registered.
-- After a successful password reset, Better Auth invalidates all active
-  sessions for that user (call `auth.api.revokeUserSessions`).
-- After sign-out, the session token is deleted from the `session` table
-  (Better Auth default).
+- Password reset responses MUST NOT confirm whether an account exists (prevents
+  account enumeration). Better Auth returns a generic success regardless of
+  whether the email is registered.
+- After a successful password reset, Better Auth invalidates all active sessions
+  for that user (call `auth.api.revokeUserSessions`).
+- After sign-out, the session token is deleted from the `session` table (Better
+  Auth default).
 
 **Resend cooldown**:
 
@@ -117,8 +116,8 @@ second gate described in User Story 5.
 **Rationale**:
 
 - Better Auth's built-in rate limiter operates at the HTTP level (total request
-  count), not at the per-account-per-wrong-credential level. A dedicated
-  lockout counter gives per-account precision.
+  count), not at the per-account-per-wrong-credential level. A dedicated lockout
+  counter gives per-account precision.
 - Redis TTL-based keys are atomic (via `INCR` + `EXPIRE`) and require no
   database round-trip during a locked state check.
 - Lockout check runs as Express middleware before the Better Auth handler on
@@ -138,16 +137,17 @@ Both stored in `@hakwa/core` and readable by the auth service.
 
 ## 5. Session Persistence on Mobile
 
-**Decision**: Mobile apps store the Better Auth session token in
-**Expo SecureStore** (`expo-secure-store`), keyed as `hakwa_session_token`.
+**Decision**: Mobile apps store the Better Auth session token in **Expo
+SecureStore** (`expo-secure-store`), keyed as `hakwa_session_token`.
 
 **Rationale**:
 
 - Expo SecureStore uses iOS Keychain / Android Keystore — hardware-backed
   credential storage safe against app-sandbox escapes.
-- On each app launch, the stored token is passed as the `Authorization: Bearer
-  <token>` header to `GET /auth/get-session`. Better Auth validates the token
-  and returns the user object — the app is restored without re-authentication.
+- On each app launch, the stored token is passed as the
+  `Authorization: Bearer <token>` header to `GET /auth/get-session`. Better Auth
+  validates the token and returns the user object — the app is restored without
+  re-authentication.
 - On sign-out, the stored token is deleted from SecureStore after the server
   call succeeds.
 

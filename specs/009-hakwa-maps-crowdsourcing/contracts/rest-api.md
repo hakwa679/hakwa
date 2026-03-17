@@ -515,7 +515,7 @@ Driver App after the road-trace worker has processed the trace server-side.
 The client only needs to submit the raw trace; the server performs all novelty
 detection and points calculation.
 
-**Auth**: Required. Caller MUST have role `operator` (driver). Returns `403`
+**Auth**: Required. Caller MUST have role `operator` (vehicle operator: driver, captain, biker, etc.). Returns `403`
 for passengers.
 
 **Request Body**:

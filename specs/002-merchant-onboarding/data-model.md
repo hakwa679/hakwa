@@ -1,7 +1,8 @@
 # Data Model: Merchant Onboarding
 
 **Feature**: 002-merchant-onboarding  
-**Schema files**: `pkg/db/schema/merchant.ts` (extended), `pkg/db/schema/wallet.ts` (reused)  
+**Schema files**: `pkg/db/schema/merchant.ts` (extended),
+`pkg/db/schema/wallet.ts` (reused)  
 **Last updated**: 2026-03-17
 
 ---
@@ -10,8 +11,8 @@
 
 The existing `merchant` table gains `status`, `licenseType`, `nationalId`, and
 `userId` columns. A new `vehicle` table is introduced for physical vehicle
-records. The existing `bankAccount` table (wallet.ts) is reused for payout
-bank details.
+records. The existing `bankAccount` table (wallet.ts) is reused for payout bank
+details.
 
 ---
 
@@ -19,16 +20,17 @@ bank details.
 
 ### `merchant` — additive columns
 
-| New Column                  | Type           | Constraint                                                | Notes                                                        |
-| --------------------------- | -------------- | --------------------------------------------------------- | ------------------------------------------------------------ |
-| `userId`                    | `text`         | NOT NULL, UNIQUE, FK → `user.id` ON DELETE CASCADE        | Links merchant record to the owning user account             |
-| `licenseType`               | `text`         | NOT NULL                                                  | `'licensed' \| 'unlicensed'`                                 |
-| `status`                    | `text`         | NOT NULL, default `'draft'`                               | `'draft' \| 'under_review' \| 'approved' \| 'rejected' \| 'suspended_pending_review'` |
-| `nationalId`                | `varchar(50)`  | nullable                                                  | Required when `licenseType = 'unlicensed'`; null otherwise   |
-| `phone`                     | `varchar(30)`  | nullable                                                  | Merchant contact number                                      |
+| New Column    | Type          | Constraint                                         | Notes                                                                                 |
+| ------------- | ------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `userId`      | `text`        | NOT NULL, UNIQUE, FK → `user.id` ON DELETE CASCADE | Links merchant record to the owning user account                                      |
+| `licenseType` | `text`        | NOT NULL                                           | `'licensed' \| 'unlicensed'`                                                          |
+| `status`      | `text`        | NOT NULL, default `'draft'`                        | `'draft' \| 'under_review' \| 'approved' \| 'rejected' \| 'suspended_pending_review'` |
+| `nationalId`  | `varchar(50)` | nullable                                           | Required when `licenseType = 'unlicensed'`; null otherwise                            |
+| `phone`       | `varchar(30)` | nullable                                           | Merchant contact number                                                               |
 
 > `tin` and `businessRegistrationNumber` already exist on the `merchant` table;
-> they remain nullable at the DB level with service-layer conditional validation.
+> they remain nullable at the DB level with service-layer conditional
+> validation.
 
 ---
 
@@ -65,17 +67,18 @@ vehicle
 
 ### `bankAccount` (wallet.ts)
 
-Merchant payout bank details use `holderType = 'merchant'`, `holderId = merchant.id`.
+Merchant payout bank details use `holderType = 'merchant'`,
+`holderId = merchant.id`.
 
-| Column              | Type           | Notes                              |
-| ------------------- | -------------- | ---------------------------------- |
-| `holderType`        | `HolderType`   | `'merchant'` for merchant payouts  |
-| `holderId`          | `varchar`      | Foreign key value (`merchant.id`)  |
-| `accountNumber`     | `varchar`      | Bank account number                |
-| `accountHolderName` | `varchar`      | Name on the account                |
-| `bankName`          | `varchar`      | e.g. "ANZ Fiji"                    |
-| `bankCode`          | `varchar`      | BSB or local bank code             |
-| `swiftCode`         | `varchar`      | SWIFT/BIC for international wires  |
+| Column              | Type         | Notes                             |
+| ------------------- | ------------ | --------------------------------- |
+| `holderType`        | `HolderType` | `'merchant'` for merchant payouts |
+| `holderId`          | `varchar`    | Foreign key value (`merchant.id`) |
+| `accountNumber`     | `varchar`    | Bank account number               |
+| `accountHolderName` | `varchar`    | Name on the account               |
+| `bankName`          | `varchar`    | e.g. "ANZ Fiji"                   |
+| `bankCode`          | `varchar`    | BSB or local bank code            |
+| `swiftCode`         | `varchar`    | SWIFT/BIC for international wires |
 
 ---
 
