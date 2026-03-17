@@ -48,3 +48,4 @@ export * from "./mapPhotoUploadClient.ts";
 export * from "./mapContributionQueue.ts";
 export * from "./hooks/useMapVerification.ts";
 export * from "./hooks/useMapStats.ts";
+export * from "./hooks/useMapPendingFeatures.ts";

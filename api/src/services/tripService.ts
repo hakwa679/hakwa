@@ -12,6 +12,29 @@ import { sendNotification } from "@hakwa/notifications";
 import { redis } from "@hakwa/redis";
 import { notifyBalanceUpdated } from "./walletService.ts";
 
+function isMapTracingEnabled(): boolean {
+  return process.env["MAP_TRACING_ENABLED"] === "true";
+}
+
+export async function publishTripCompletedRoadTraceJob(input: {
+  tripId: string;
+  driverId: string;
+  completedAt: string;
+}): Promise<void> {
+  await redis.xadd(
+    "map:roadtrace:events",
+    "*",
+    "type",
+    "trip_completed_trace",
+    "tripId",
+    input.tripId,
+    "userId",
+    input.driverId,
+    "timestamp",
+    input.completedAt,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Error class
 // ---------------------------------------------------------------------------
@@ -177,6 +200,14 @@ export async function completeTrip(
       tripId,
     }).catch((err: unknown) => {
       console.error("[tripService] notifyBalanceUpdated failed", { err });
+    });
+  }
+
+  if (isMapTracingEnabled()) {
+    await publishTripCompletedRoadTraceJob({
+      tripId,
+      driverId,
+      completedAt: completedAt.toISOString(),
     });
   }
 

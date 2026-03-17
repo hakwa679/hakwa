@@ -11,6 +11,7 @@
         "@hakwa/redis": "*",
         "@hakwa/email": "*",
         "expo-server-sdk": "latest",
+        "twilio": "latest",
         "zod": "latest"
     },
     "devDependencies": {

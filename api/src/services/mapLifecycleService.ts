@@ -7,6 +7,8 @@ import {
   publishFeatureActivated,
   refreshActiveMapGeoJsonCache,
 } from "./mapRedisService.ts";
+import { updateMissionProgressForAction } from "./mapMissionService.ts";
+import { updateZoneProgressOnFeatureActivation } from "./mapZoneService.ts";
 
 export async function applyFeatureVoteThresholds(featureId: string): Promise<{
   id: string;
@@ -78,9 +80,31 @@ export async function applyFeatureVoteThresholds(featureId: string): Promise<{
     })
     .then(async (updated) => {
       if (updated.status === "active") {
+        const [feature] = await db
+          .select({
+            contributorId: mapFeature.contributorId,
+            zoneId: mapFeature.zoneId,
+          })
+          .from(mapFeature)
+          .where(eq(mapFeature.id, updated.id))
+          .limit(1);
+
         await invalidateMapActiveLayerCache();
         await refreshActiveMapGeoJsonCache();
         await publishFeatureActivated(updated.id);
+
+        if (feature) {
+          await updateZoneProgressOnFeatureActivation({
+            featureId: updated.id,
+            contributorId: feature.contributorId,
+            zoneId: feature.zoneId,
+          });
+
+          await updateMissionProgressForAction({
+            userId: feature.contributorId,
+            actionType: "zone_progress",
+          });
+        }
       }
       return updated;
     });

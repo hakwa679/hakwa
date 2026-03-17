@@ -27,10 +27,19 @@ import { startGamificationConsumer } from "./jobs/gamificationConsumer.ts";
 import { mapRouter } from "./routes/map.ts";
 import { mapUploadsRouter } from "./routes/mapUploads.ts";
 import { adminMapRouter } from "./routes/adminMap.ts";
+import { registerMapWeeklyMissionCron } from "./jobs/mapWeeklyMissionJob.ts";
+import { registerMapLeaderboardRolloverCron } from "./jobs/mapLeaderboardRolloverJob.ts";
+import { safetyRouter } from "./routes/safety.ts";
+import { adminSafetyRouter } from "./routes/admin/safety.ts";
+import { startSafetySmsSender } from "./workers/smsSender.ts";
+import { startSafetyCheckInEscalationWorker } from "./workers/checkInEscalation.ts";
+import { validateSafetyEnvironment } from "./config/env.ts";
 
 const server = express();
 const httpServer = createServer(server);
 const port = process.env["PORT"];
+
+validateSafetyEnvironment();
 
 // middleware
 server.use(express.json());
@@ -55,6 +64,8 @@ server.use("/api/me/gamification", meGamificationRouter);
 server.use("/api/v1/map", mapRouter);
 server.use("/api/v1/map/uploads", mapUploadsRouter);
 server.use("/api/v1/admin/map", adminMapRouter);
+server.use("/api/v1/safety", safetyRouter);
+server.use("/api/v1/admin/safety", adminSafetyRouter);
 
 // WebSocket
 attachWebSocketServer(httpServer);
@@ -102,6 +113,9 @@ startGamificationConsumer().catch((err: unknown) => {
   process.exit(1);
 });
 
+startSafetySmsSender();
+startSafetyCheckInEscalationWorker();
+
 // Re-engagement cron — daily at 09:00 Fiji time (UTC+12 → 21:00 UTC previous day)
 cron.schedule("0 21 * * *", () => {
   runReEngagementJob().catch((err: unknown) => {
@@ -110,6 +124,8 @@ cron.schedule("0 21 * * *", () => {
 });
 
 registerWeeklyPayoutCron();
+registerMapWeeklyMissionCron();
+registerMapLeaderboardRolloverCron();
 
 // Start the server
 httpServer.listen(port, () => {

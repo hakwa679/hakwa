@@ -21,6 +21,7 @@ import {
 } from "./mapSafetyService.ts";
 import { validateMapSubmitInput } from "./mapValidationService.ts";
 import { findNearbyPendingSameType } from "./mapQueryService.ts";
+import { updateMissionProgressForAction } from "./mapMissionService.ts";
 
 export interface SubmitMapContributionInput {
   featureType: "poi" | "road" | "landmark" | "hazard" | "pickup_spot" | "other";
@@ -94,7 +95,7 @@ export async function submitMapContribution(
 
   const status = screening.outcome === "flag" ? "pending_review" : "pending";
 
-  return db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const [createdFeature] = await tx
       .insert(mapFeature)
       .values({
@@ -190,4 +191,20 @@ export async function submitMapContribution(
       createdAt: createdFeature.createdAt,
     };
   });
+
+  if (input.featureType === "poi") {
+    await updateMissionProgressForAction({
+      userId,
+      actionType: "contribute_poi",
+    });
+  }
+
+  if (input.photoUrl) {
+    await updateMissionProgressForAction({
+      userId,
+      actionType: "contribute_with_photo",
+    });
+  }
+
+  return created;
 }

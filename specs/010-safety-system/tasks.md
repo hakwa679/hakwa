@@ -4,371 +4,465 @@ description: "Task list for Rider & Driver Safety System"
 
 # Tasks: Rider & Driver Safety System
 
-**Feature Branch**: `010-safety-system` **Input**: plan.md, spec.md,
-data-model.md **Tech Stack**: TypeScript 5.x, Drizzle ORM, PostgreSQL, Redis
-Streams (`safety:sms:outbox`), Redis pub/sub (`safety:sos`), `@hakwa/workers`,
-`@hakwa/notifications` (Twilio SMS adapter), `ws`, Expo / React Native
+**Input**: Design documents from `specs/010-safety-system/` **Prerequisites**:
+`plan.md` (required), `spec.md` (required), `research.md`, `data-model.md`,
+`contracts/rest-api.md`, `quickstart.md`
 
----
+**Tests**: Automated tests are required by this feature's checklist. Include
+contract, integration, and targeted performance/security checks.
+
+**Organization**: Tasks are grouped by user story so each story is independently
+implementable and testable.
 
 ## Format: `[ID] [P?] [Story] Description`
 
-- **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Which user story this task belongs to (US1–US7)
-- All paths relative to repo root
+- **[P]**: Task can run in parallel (different files, no dependency on
+  unfinished tasks)
+- **[Story]**: User story label (`[US1]` ... `[US7]`) for story-phase tasks only
+- Every task includes an explicit file path
 
 ---
 
-## Phase 1: Setup (Schema)
+## Phase 1: Setup (Schema + Contracts Scaffold)
 
-**Purpose**: Define all safety tables and extend merchant status enum before any
-safety route or worker code
+**Purpose**: Create safety schema baseline and route/test scaffolding shared by
+all stories.
 
-- [ ] T001 Define `safetyIncident` table (id, referenceCode `SAF-YYMMDD-XXXX`
-      UNIQUE, reporterId FK→user SET NULL, subjectId nullable FK→user SET NULL,
-      tripId nullable FK→trip SET NULL, type
-      `sos|wrong_vehicle|route_deviation_escalation|speed_anomaly_escalation|stop_anomaly_escalation|formal_report`,
-      category nullable, reporterRole `passenger|driver`, status
-      `active|acknowledged|open|resolved|unsubstantiated|driver_actioned`,
-      locationSnapshotJson, description, evidenceUrl, resolutionNotes,
-      smsDispatchedAt, smsFailed default false, createdAt, updatedAt,
-      resolvedAt) with indexes on `reporterId`, `tripId`, `status`, `createdAt`
-      in `pkg/db/schema/safety.ts`
-- [ ] T002 [P] Define `safetyContact` table (id, userId FK→user CASCADE, name,
-      phone varchar(20) E.164, label nullable, isActive default true, createdAt,
-      updatedAt) with indexes on `userId` and `(userId, isActive)` in
-      `pkg/db/schema/safety.ts`
-- [ ] T003 [P] Define `tripShare` table (id, tripId FK→trip CASCADE, createdBy
-      FK→user SET NULL, token varchar(64) UNIQUE NOT NULL, status
-      `active|expired|revoked`, expiresAt, createdAt) in
-      `pkg/db/schema/safety.ts`
-- [ ] T004 [P] Define `safetyCheckIn` table (id, tripId FK→trip SET NULL, userId
-      FK→user CASCADE, type `route_deviation|stop_anomaly|speed_anomaly`, status
-      `pending|ok_confirmed|escalated|cancelled`, createdAt, respondedAt,
-      escalatedAt) with index on `(tripId, status)` in `pkg/db/schema/safety.ts`
-- [ ] T005 Extend `merchantStatusEnum` in `pkg/db/schema/merchant.ts` with
-      `suspended_pending_review` value (additive only)
-- [ ] T006 Export all safety entities from `pkg/db/schema/index.ts` and run
-      `db-push`
+- [x] T001 Create `safetyIncident`, `safetyContact`, `tripShare`, and
+      `safetyCheckIn` tables in `pkg/db/schema/safety.ts`
+- [x] T002 [P] Extend merchant status enum with `suspended_pending_review` in
+      `pkg/db/schema/merchant.ts`
+- [x] T003 [P] Export safety schema in `pkg/db/schema/index.ts`
+- [x] T004 Create initial migration snapshot and validate schema push script in
+      `pkg/db/drizzle.config.ts`
+- [x] T005 Add safety API router scaffold with TODO handlers in
+      `api/src/routes/safety.ts`
+- [x] T006 [P] Add safety admin router scaffold in
+      `api/src/routes/admin/safety.ts`
+- [x] T007 Wire safety router mounts in `api/src/index.ts`
 
 ---
 
-## Phase 2: Foundational (SMS Pipeline + Check-in Worker)
+## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Twilio adapter and SMS outbox pipeline must exist before SOS can
-dispatch messages; check-in escalation worker must run before anomaly detection
-is useful
+**Purpose**: Implement cross-story infrastructure for auth, SMS outbox,
+websocket events, env validation, and shared utilities.
 
-- [ ] T007 Implement `TwilioSmsAdapter` in
-      `pkg/notifications/src/adapters/twilio.ts` implementing `SmsService`
-      interface: `sendSms(to: string, body: string): Promise<void>` — calls
-      Twilio API; on failure re-queue to `safety:sms:outbox` with retry count;
-      requires `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`
-      env vars
-- [ ] T008 Implement `smsSender.ts` worker in `api/src/workers/smsSender.ts` —
-      `XREAD` loop on `safety:sms:outbox`; dispatch each message via
-      `TwilioSmsAdapter`; on `DeviceNotRegistered`-equivalent or permanent
-      failure set `safetyIncident.smsFailed = true`
-- [ ] T009 Implement `checkInEscalation.ts` worker in
-      `api/src/workers/checkInEscalation.ts` — polling every 15 s; query
-      `safetyCheckIn WHERE status = 'pending' AND escalatedAt IS NULL AND createdAt <= now() - INTERVAL '90 seconds'`;
-      for each: XADD SOS SMS to `safety:sms:outbox`; create `safetyIncident`
-      row; update `safetyCheckIn.status = 'escalated'`
-- [ ] T010 Register `smsSender` and `checkInEscalation` workers in
-      `api/src/index.ts` on startup
-- [ ] T011 Subscribe to `safety:sos` Redis pub/sub in `api/src/websocket.ts` —
-      relay to connected admin/safety-team WebSocket clients as
-      `safety.sos_triggered` event
+**CRITICAL**: No user story implementation starts until this phase is done.
 
-**Checkpoint**: SMS pipeline and escalation worker are live — SOS can dispatch
-SMS, check-in escalation is automated
+- [x] T008 Implement shared safety error codes and messages in
+      `errors/src/codes.ts`
+- [x] T009 [P] Export safety error helpers through package barrel in
+      `errors/index.ts`
+- [x] T010 Implement safety reference code generator utility in
+      `core/src/safety/reference-code.ts`
+- [x] T011 [P] Implement E.164 phone normalization utility with Fiji defaults in
+      `core/src/safety/phone-normalize.ts`
+- [x] T012 [P] Implement safety WebSocket event publisher helper in
+      `api/src/services/safetyEvents.ts`
+- [x] T013 Implement Twilio SMS adapter with retry metadata in
+      `notifications/src/adapters/twilio.ts`
+- [x] T014 Implement Redis Stream SMS worker (`safety:sms:outbox`) in
+      `api/src/workers/smsSender.ts`
+- [x] T015 Implement pending check-in escalation worker loop in
+      `api/src/workers/checkInEscalation.ts`
+- [x] T016 Register safety workers and pub/sub subscriptions in
+      `api/src/index.ts`
+- [x] T017 Add `SAFETY_CODE_SECRET` and Twilio env validation at startup in
+      `api/src/config/env.ts`
+- [x] T018 Add foundational integration test for SMS outbox enqueue/dequeue path
+      in `api/tests/integration/safety.outbox.integration.test.ts`
 
----
-
-## Phase 3: User Story 1 — SOS Activation (Priority: P1) 🎯 MVP
-
-**Goal**: Passenger or driver with active trip triggers SOS; `safetyIncident`
-row created; SMS queued to all active emergency contacts; safety team WebSocket
-event emitted; silent volume-button path works.
-
-**Independent Test**: `POST /api/safety/sos` with valid `tripId` →
-`safetyIncident` row (`type = sos, status = active`); SMS entry in
-`safety:sms:outbox` for each contact; `safety.sos_triggered` emitted on pub/sub;
-second call returns 409 `SAFETY_SOS_ALREADY_ACTIVE`.
-
-- [ ] T012 [US1] Implement `triggerSOS` in `api/src/services/safetyService.ts`:
-      (1) verify `trip.status IN (accepted, driver_arrived, in_progress)` for
-      caller — else `SAFETY_NO_ACTIVE_TRIP`, (2) idempotency check: if
-      `safetyIncident` with `(tripId, type='sos', status='active')` exists
-      return 409, (3) generate
-      `referenceCode = SAF-{YYMMDD}-{4 random alphanumeric}`, (4) insert
-      `safetyIncident` row, (5) load active `safetyContact` rows, (6)
-      `XADD safety:sms:outbox` for each contact, (7)
-      `redis.publish('safety:sos', { incidentId, tripId, location })`, (8)
-      enqueue push notification via `@hakwa/notifications`
-- [ ] T013 [P] [US1] Implement `POST /api/safety/sos` route in
-      `api/src/routes/safety.ts` — require session; call `triggerSOS`; return
-      `{ incidentId, referenceCode, emergencyNumbers }`
-- [ ] T014 [P] [US1] Build `SafetyPanel.tsx` in
-      `apps/mobile/rider/src/screens/ActiveTrip/SafetyPanel.tsx` — shield icon
-      with 2-second long-press; 5-second countdown overlay with "Cancel" button;
-      on expiry call `POST /api/safety/sos`; show safety card with Fiji
-      emergency numbers (Ambulance: 911, Police: 917, Fire: 910)
-- [ ] T015 [P] [US1] Implement `useSilentSOS.ts` hook in
-      `apps/mobile/rider/src/hooks/useSilentSOS.ts` —
-      `react-native-volume-manager` listener; three presses within 2 s → call
-      `POST /api/safety/sos` with `silent: true`; no visible UI change beyond
-      brief vibration
-- [ ] T016 [P] [US1] Mirror `SafetyPanel.tsx` and `useSilentSOS.ts` in
-      `apps/mobile/driver/src/screens/ActiveTrip/SafetyPanel.tsx` and
-      `apps/mobile/driver/src/hooks/useSilentSOS.ts` with driver-specific
-      framing
-
-**Checkpoint**: User Story 1 complete — SOS pipeline from tap or volume button
-to SMS dispatch and WebSocket alert is operational
+**Checkpoint**: Foundational safety infrastructure ready; user stories can
+proceed.
 
 ---
 
-## Phase 4: User Story 4 — Manage Emergency Contacts (Priority: P1)
+## Phase 3: User Story 1 - Trigger SOS During Active Trip (Priority: P1) 🎯 MVP
 
-**Goal**: Users can add (max 3), delete, and test emergency contacts; contacts
-stored in E.164; test SMS does not create `safetyIncident`.
+**Goal**: Allow passenger or driver to trigger SOS with deduplication, async SMS
+fan-out, and safety-team event dispatch.
 
-**Independent Test**: `POST /api/safety/contacts` with valid name and phone →
-row created in E.164; fourth contact → 409 `SAFETY_CONTACT_LIMIT_REACHED`;
-`POST /api/safety/contacts/:id/test-alert` → SMS queued without creating
-`safetyIncident`.
+**Independent Test**: `POST /api/v1/safety/sos` creates one active incident,
+queues SMS, emits websocket event, and deduplicates repeats within 60 seconds.
 
-- [ ] T017 [US4] Implement `POST /api/safety/contacts`,
-      `GET /api/safety/contacts`, `DELETE /api/safety/contacts/:id` in
-      `api/src/routes/safety.ts` — session required; enforce max 3 active
-      contacts; normalise phone to E.164 using `libphonenumber-js` (Fiji country
-      code +679 as default); ownership check on delete
-- [ ] T018 [P] [US4] Implement `POST /api/safety/contacts/:id/test-alert` in
-      `api/src/routes/safety.ts` — queue test SMS to contact
-      (`XADD safety:sms:outbox`); no `safetyIncident` created; rate-limit to 1
-      test per contact per 24 h
-- [ ] T019 [P] [US4] Build `EmergencyContacts.tsx` screen in
-      `apps/mobile/rider/src/screens/Settings/EmergencyContacts.tsx` — list of
-      contacts, add form, delete, test alert; one-time onboarding nudge card on
-      first app open if 0 contacts
+### Tests for User Story 1
 
-**Checkpoint**: User Story 4 complete — emergency contacts management is
-functional; SOS now has recipients
+- [ ] T019 [P] [US1] Add contract test for `POST /safety/sos` in
+      `api/tests/contract/safety.sos.contract.test.ts`
+- [ ] T020 [P] [US1] Add integration test for SOS creation + outbox enqueue in
+      `api/tests/integration/safety.sos.integration.test.ts`
+- [ ] T021 [P] [US1] Add integration test for SOS dedup key TTL behavior in
+      `api/tests/integration/safety.sos-dedup.integration.test.ts`
+- [ ] T022 [P] [US1] Add websocket event assertion test for
+      `safety.sos_triggered` in
+      `api/tests/integration/safety.sos-websocket.integration.test.ts`
+- [ ] T091 [P] [US1] Add integration test for `safety.check_in_escalated` and
+      `safety.critical_incident` websocket emissions in
+      `api/tests/integration/safety.events.integration.test.ts`
 
----
+### Implementation for User Story 1
 
-## Phase 5: User Story 2 — Live Trip Sharing (Priority: P1)
+- [ ] T023 [US1] Implement `triggerSOS` domain flow in
+      `api/src/services/safetyService.ts`
+- [ ] T024 [P] [US1] Implement `POST /safety/sos` endpoint handler in
+      `api/src/routes/safety.ts`
+- [ ] T025 [P] [US1] Implement Redis dedup key `safety:sos_dedup:<tripId>` with
+      60s TTL in `api/src/services/safetyService.ts`
+- [ ] T026 [P] [US1] Implement rider long-press SOS countdown UI in
+      `apps/mobile/passenger/src/screens/ActiveTrip/SafetyPanel.tsx`
+- [ ] T027 [P] [US1] Implement rider silent SOS volume-button trigger hook in
+      `apps/mobile/passenger/src/hooks/useSilentSOS.ts`
+- [ ] T028 [P] [US1] Implement driver SOS parity UI and silent trigger in
+      `apps/mobile/driver/src/screens/ActiveTrip/SafetyPanel.tsx`
 
-**Goal**: Passenger generates a cryptographic share link; third party opens in
-browser to see driver details + live GPS; SSE pushes updates every 5 s; link
-expires 15 min after trip end; revoke supported.
-
-**Independent Test**: `POST /api/safety/trips/:tripId/share` → `tripShare` row
-with 128-bit token; `GET /api/safety/share/:token` (no auth) → driver name,
-plate, passenger GPS, booking status; after expiry → 410.
-
-- [ ] T020 [US2] Implement `POST /api/safety/trips/:tripId/share` in
-      `api/src/routes/safety.ts` — require session; verify trip belongs to
-      caller and status valid; `crypto.randomBytes(32).toString('hex')` for
-      token; `expiresAt = trip.estimatedArrival + 15 min` (or
-      `now() + trip.estimatedDuration + 15 min`); insert `tripShare` row
-- [ ] T021 [US2] Implement `GET /api/safety/share/:token` (public, no auth) in
-      `api/src/routes/safety.ts` — validate token exists and `status = active`
-      and `expiresAt > now()`; return driver first name, photoUrl, vehicle make,
-      colour, plate, booking status, passenger last GPS from Redis location hash
-      (no raw coordinates logged)
-- [ ] T022 [P] [US2] Implement SSE endpoint
-      `GET /api/safety/share/:token/stream` — validate token; stream
-      `data: { lat, lng, eta }` JSON every 5 s from Redis location hash; close
-      stream when trip completes + 15 min or token revoked
-- [ ] T023 [P] [US2] Implement `DELETE /api/safety/trips/:tripId/share` (revoke)
-      — session + ownership check; `UPDATE tripShare SET status = 'revoked'`;
-      close active SSE connections via Redis pub/sub signal
-- [ ] T024 [P] [US2] Build share UI in
-      `apps/mobile/rider/src/screens/ActiveTrip/` — share icon taps to
-      `POST /api/safety/trips/:tripId/share`; copy share URL button; "Stop
-      sharing" triggers DELETE; prompt on route deviation per spec
-
-**Checkpoint**: User Story 2 complete — browser-viewable live share link with
-SSE is functional
+**Checkpoint**: US1 works independently with automated tests passing.
 
 ---
 
-## Phase 6: User Story 3 — Vehicle Verification (Priority: P1)
+## Phase 4: User Story 2 - Share Live Trip with Trusted Contact (Priority: P1)
 
-**Goal**: 4-digit HMAC safety code shown on both passenger and driver screens
-for matching before boarding; wrong vehicle reporting creates `safetyIncident`.
+**Goal**: Generate/revoke public share links and stream location updates via SSE
+without authentication.
 
-**Independent Test**: `GET /api/safety/trips/:tripId/verify` returns a
-deterministic 4-digit code computed from
-`HMAC-SHA256(bookingId + tripDate, SAFETY_CODE_SECRET)` (first 4 decimal
-digits); same code returned for both passenger and driver with same `tripId`.
+**Independent Test**: A passenger creates a share link, viewer accesses
+`GET /safety/share/:token` and receives live-safe data, SSE updates every <=5s,
+revoked/expired links return 410.
 
-- [ ] T025 [US3] Implement safety code utility in `pkg/core/src/safetyCode.ts` —
-      `generateSafetyCode(bookingId: string, date: string): string` using
-      `HMAC-SHA256(bookingId + date, SAFETY_CODE_SECRET)` → first 4 decimal
-      digits extracted from hex digest
-- [ ] T026 [US3] Implement `GET /api/safety/trips/:tripId/verify` in
-      `api/src/routes/safety.ts` — session required; verify caller is passenger
-      or driver on this trip; return
-      `{ safetyCode, vehiclePlate, vehicleMake, vehicleModel, vehicleColour }`
-- [ ] T027 [P] [US3] Implement `POST /api/safety/trips/:tripId/wrong-vehicle` —
-      session required; validate caller is passenger; create `safetyIncident`
-      row (`type = wrong_vehicle`); flag booking for review; return
-      `{ referenceCode }` and prompt user to stay put
+### Tests for User Story 2
 
-**Checkpoint**: User Story 3 complete — vehicle verification code and
-wrong-vehicle reporting are functional
+- [ ] T029 [P] [US2] Add contract tests for share create/revoke/public read
+      endpoints in `api/tests/contract/safety.share.contract.test.ts`
+- [ ] T030 [P] [US2] Add integration test for token creation entropy and
+      active-share rotation in
+      `api/tests/integration/safety.share-token.integration.test.ts`
+- [ ] T031 [P] [US2] Add integration test for `410 SAFETY_SHARE_EXPIRED`
+      lifecycle in
+      `api/tests/integration/safety.share-expiry.integration.test.ts`
+- [ ] T032 [P] [US2] Add SSE integration test for location events and close
+      semantics in `api/tests/integration/safety.share-sse.integration.test.ts`
+- [ ] T033 [P] [US2] Add security test ensuring token not present in error
+      body/log payloads in
+      `api/tests/integration/safety.share-security.integration.test.ts`
 
----
+### Implementation for User Story 2
 
-## Phase 7: User Story 5 — Automated In-Trip Safety Check-ins (Priority: P2)
+- [ ] T034 [US2] Implement create/revoke/share lookup service methods in
+      `api/src/services/safetyShareService.ts`
+- [ ] T035 [P] [US2] Implement `POST /safety/trips/:tripId/share` in
+      `api/src/routes/safety.ts`
+- [ ] T036 [P] [US2] Implement `DELETE /safety/trips/:tripId/share` in
+      `api/src/routes/safety.ts`
+- [ ] T037 [P] [US2] Implement public `GET /safety/share/:token` response
+      shaping in `api/src/routes/safety.ts`
+- [ ] T038 [P] [US2] Implement `GET /safety/share/:token/stream` SSE endpoint in
+      `api/src/routes/safety.ts`
+- [ ] T039 [P] [US2] Implement share expiry updater job in
+      `api/src/jobs/tripShareExpiry.ts`
+- [ ] T040 [P] [US2] Implement passenger app share/revoke UI actions in
+      `apps/mobile/passenger/src/screens/ActiveTrip/TripShareCard.tsx`
 
-**Goal**: Route deviation (>500m for >2 min), prolonged stop (>8 min outside
-geofence), speed anomaly (>130 km/h for >30 s) each trigger `safetyCheckIn`
-prompt; 90 s timeout escalates via SMS and creates `safetyIncident`.
-
-**Independent Test**: Injecting route-deviation coordinates into the location
-update handler creates a `safetyCheckIn` row and emits
-`safety.check_in_required` WebSocket event without GPS hardware — independently
-of SOS and contacts.
-
-- [ ] T028 [US5] Implement `checkRouteDeviation(tripId, lat, lng)` in
-      `api/src/services/locationService.ts` — compare against trip's planned
-      polyline (stored as JSON on `trip`); increment Redis counter
-      `deviation:{tripId}` on each off-route reading; if counter exceeds
-      threshold (2 min of off-route readings at 10 s per update = 12
-      consecutive) → call `createCheckIn`
-- [ ] T029 [US5] Implement `createCheckIn` in
-      `api/src/services/safetyService.ts` — insert `safetyCheckIn` row; publish
-      `safety.check_in_required` WebSocket event to passenger's WebSocket
-      channel
-- [ ] T030 [P] [US5] Implement stop and speed anomaly checks in
-      `api/src/services/locationService.ts` — Redis hash `trip:{tripId}:stop`
-      tracks stationary start time; speed computed from consecutive location
-      updates; call `createCheckIn` when thresholds crossed
-- [ ] T031 [P] [US5] Implement `POST /api/safety/check-ins/:id/respond` in
-      `api/src/routes/safety.ts` — session required; update
-      `safetyCheckIn.status = ok_confirmed`, `respondedAt = now()`; clear Redis
-      deviation/stop counters
-- [ ] T032 [P] [US5] Implement `POST /api/safety/check-ins/:id/cancel` — update
-      `safetyCheckIn.status = cancelled`; clear Redis counters (check-in
-      escalation worker will skip cancelled rows)
-- [ ] T033 [P] [US5] Build check-in prompt modal in
-      `apps/mobile/rider/src/screens/ActiveTrip/` — "Are you OK?" overlay
-      triggered by `safety.check_in_required` WebSocket event; 90-second
-      countdown; "I'm OK" and "Cancel Alert" buttons
-
-**Checkpoint**: User Story 5 complete — automated anomaly detection with
-check-in → escalation pipeline is functional
+**Checkpoint**: US2 is independently testable and deployable.
 
 ---
 
-## Phase 8: User Story 6 — Incident Reporting (Priority: P2)
+## Phase 5: User Story 3 - Verify Vehicle Before Boarding (Priority: P1)
 
-**Goal**: Formal incident report with category selection, optional evidence
-upload, critical categories auto-suspend driver; non-critical go to review
-queue; reference code returned.
+**Goal**: Deterministic 4-digit safety code and wrong-vehicle reporting
+workflow.
 
-**Independent Test**: `POST /api/safety/incidents/report` with `tripId` and
-`category = verbal_abuse` → `safetyIncident` row with `status = open`, no driver
-suspension; `category = assault` → driver `status = suspended_pending_review` in
-same transaction.
+**Independent Test**: Passenger and driver see same deterministic code for a
+trip/day, and wrong-vehicle report creates an incident with immediate suspension
+workflow.
 
-- [ ] T034 [US6] Implement `POST /api/safety/incidents/report` in
-      `api/src/routes/safety.ts` — session required; validate `tripId` is
-      associated with caller; generate `referenceCode`; if critical category
-      (`assault`, `wrong_vehicle`): begin transaction — insert incident, update
-      driver's user/merchant `status = 'suspended_pending_review'`, commit;
-      publish `safety.critical_incident` WebSocket event; else insert incident
-      with `status = open`
-- [ ] T035 [P] [US6] Implement `GET /api/safety/incidents/:id` — session
-      required; ownership check; return incident with status, referenceCode,
-      category
-- [ ] T036 [P] [US6] Implement presigned URL endpoint
-      `POST /api/safety/incidents/:id/evidence` — session required; validate
-      MIME type (`image/jpeg`, `image/png`, `audio/mp4`) and max size (10 MB);
-      return presigned upload URL to CDN (R2/S3); update
-      `safetyIncident.evidenceUrl` on callback
-- [ ] T037 [P] [US6] Build incident report form in
-      `apps/mobile/rider/src/screens/SafetyReportScreen.tsx` — category picker,
-      optional description, optional media attachment, submit button; show
-      `referenceCode` on success
+### Tests for User Story 3
 
-**Checkpoint**: User Story 6 complete — formal incident reporting including
-critical-category auto-suspension is operational
+- [ ] T041 [P] [US3] Add unit test for HMAC safety-code generation and date
+      rotation in `core/src/safety/reference-code.test.ts`
+- [ ] T042 [P] [US3] Add contract tests for verify and wrong-vehicle endpoints
+      in `api/tests/contract/safety.verify.contract.test.ts`
+- [ ] T043 [P] [US3] Add integration test for wrong-vehicle -> incident +
+      suspension transaction in
+      `api/tests/integration/safety.wrong-vehicle.integration.test.ts`
 
----
+### Implementation for User Story 3
 
-## Phase 9: User Story 7 — Safety History (Priority: P3)
+- [ ] T044 [US3] Implement deterministic safety-code helper in
+      `core/src/safety/safety-code.ts`
+- [ ] T045 [P] [US3] Implement `GET /safety/trips/:tripId/verify` in
+      `api/src/routes/safety.ts`
+- [ ] T046 [P] [US3] Implement `POST /safety/trips/:tripId/wrong-vehicle` in
+      `api/src/routes/safety.ts`
+- [ ] T047 [P] [US3] Implement passenger verify-plate full-screen UI in
+      `apps/mobile/passenger/src/screens/ActiveTrip/VehicleVerifyCard.tsx`
+- [ ] T048 [P] [US3] Implement driver mirrored safety-code display in
+      `apps/mobile/driver/src/screens/ActiveTrip/VehicleVerifyCard.tsx`
 
-**Goal**: Authenticated users view their own paginated safety history
-(incidents + check-ins); admins can resolve incidents.
-
-- [ ] T038 [US7] Implement `GET /api/safety/history` in
-      `api/src/routes/safety.ts` — session required; paginated query on
-      `safetyIncident WHERE reporterId = userId ORDER BY createdAt DESC` (20 per
-      page, cursor pagination); include `safetyCheckIn` rows linked to same
-      user's trips; map to summary DTO with `referenceCode`, `type`, `status`,
-      `resolvedAt`
+**Checkpoint**: US3 complete with deterministic cross-app verification.
 
 ---
 
-## Phase 10: Admin Safety Queue (Priority: P2)
+## Phase 6: User Story 4 - Manage Emergency Contacts (Priority: P1)
 
-- [ ] T039 [P] Implement `GET /admin/safety/incidents` in
-      `api/src/routes/admin/safety.ts` — require `role = admin`; paginated queue
-      filtered by `status IN (active, open)`; ordered by `createdAt ASC`
-- [ ] T040 [P] Implement `PATCH /admin/safety/incidents/:id` — admin
-      resolve/acknowledge endpoint; transitions `status` to
-      `resolved|acknowledged|unsubstantiated|driver_actioned`; sets
-      `resolvedAt`; notify reporter via `@hakwa/notifications` push
+**Goal**: Users can add/list/delete up to 3 contacts and trigger test alerts.
+
+**Independent Test**: Contact CRUD respects ownership and max limit; test-alert
+queues SMS and does not create incidents.
+
+### Tests for User Story 4
+
+- [ ] T049 [P] [US4] Add contract tests for contacts CRUD and test-alert in
+      `api/tests/contract/safety.contacts.contract.test.ts`
+- [ ] T050 [P] [US4] Add integration test for E.164 normalization and
+      contact-limit enforcement in
+      `api/tests/integration/safety.contacts.integration.test.ts`
+- [ ] T051 [P] [US4] Add integration test asserting test-alert does not insert
+      `safetyIncident` in
+      `api/tests/integration/safety.test-alert.integration.test.ts`
+
+### Implementation for User Story 4
+
+- [ ] T052 [US4] Implement contacts service (list/add/delete/test-alert) in
+      `api/src/services/safetyContactsService.ts`
+- [ ] T053 [P] [US4] Implement `GET|POST|DELETE /safety/contacts*` routes in
+      `api/src/routes/safety.ts`
+- [ ] T054 [P] [US4] Implement one-time onboarding nudge persistence logic in
+      `apps/mobile/passenger/src/screens/Settings/EmergencyContactsScreen.tsx`
+- [ ] T055 [P] [US4] Implement passenger emergency contacts management UI in
+      `apps/mobile/passenger/src/screens/Settings/EmergencyContactsScreen.tsx`
+- [ ] T056 [P] [US4] Implement driver emergency contacts management UI in
+      `apps/mobile/driver/src/screens/Settings/EmergencyContactsScreen.tsx`
+
+**Checkpoint**: US4 complete; SOS recipients can be managed end-to-end.
 
 ---
 
-## Final Phase: Polish & Cross-Cutting Concerns
+## Phase 7: User Story 5 - Automated In-Trip Safety Check-ins (Priority: P2)
 
-- [ ] T041 [P] Add `SAFETY_CODE_SECRET` env var to configuration; validate on
-      startup
-- [ ] T042 [P] Add nightly cron in `api/src/jobs/tripShareExpiry.ts` —
-      `UPDATE tripShare SET status = 'expired' WHERE status = 'active' AND expiresAt < now()`
-- [ ] T043 [P] Error codes: register `SAFETY_NO_ACTIVE_TRIP`,
-      `SAFETY_SOS_ALREADY_ACTIVE`, `SAFETY_CONTACT_LIMIT_REACHED`,
-      `SAFETY_SHARE_EXPIRED`, `SAFETY_WRONG_MIME_TYPE` in `@hakwa/errors`
+**Goal**: Detect anomaly thresholds and enforce 90-second check-in escalation
+flow.
+
+**Independent Test**: Injected telemetry triggers one check-in per cooldown
+window and escalates if unanswered.
+
+### Tests for User Story 5
+
+- [ ] T057 [P] [US5] Add integration test for route-deviation threshold logic in
+      `api/tests/integration/safety.route-deviation.integration.test.ts`
+- [ ] T058 [P] [US5] Add integration test for prolonged-stop and speed anomalies
+      in `api/tests/integration/safety.anomalies.integration.test.ts`
+- [ ] T059 [P] [US5] Add integration test for 20-minute anomaly cooldown key in
+      `api/tests/integration/safety.cooldown.integration.test.ts`
+- [ ] T060 [P] [US5] Add integration test for escalation at 90 seconds +
+      incident creation in
+      `api/tests/integration/safety.checkin-escalation.integration.test.ts`
+- [ ] T061 [P] [US5] Add contract test for
+      `POST /safety/check-ins/:checkInId/respond` in
+      `api/tests/contract/safety.checkin-respond.contract.test.ts`
+
+### Implementation for User Story 5
+
+- [ ] T062 [US5] Implement anomaly detector service (route/stop/speed) in
+      `api/src/services/safetyAnomalyService.ts`
+- [ ] T063 [P] [US5] Integrate anomaly checks into telemetry flow in
+      `api/src/services/locationService.ts`
+- [ ] T064 [P] [US5] Implement check-in creation/respond domain logic in
+      `api/src/services/safetyCheckInService.ts`
+- [ ] T065 [P] [US5] Implement check-in response endpoint in
+      `api/src/routes/safety.ts`
+- [ ] T066 [P] [US5] Implement passenger check-in prompt modal and countdown in
+      `apps/mobile/passenger/src/screens/ActiveTrip/SafetyCheckInModal.tsx`
+
+**Checkpoint**: US5 anomaly detection and escalation are fully functional.
 
 ---
 
-## Dependencies
+## Phase 8: User Story 6 - Report a Safety Incident (Priority: P2)
 
+**Goal**: Allow formal reports with optional evidence and critical-category
+auto-suspension.
+
+**Independent Test**: Critical categories atomically suspend merchant while
+creating incident; non-critical reports stay open without suspension.
+
+### Tests for User Story 6
+
+- [ ] T067 [P] [US6] Add contract test for `POST /safety/incidents/report` in
+      `api/tests/contract/safety.report.contract.test.ts`
+- [ ] T068 [P] [US6] Add integration test for critical-category transaction
+      semantics in
+      `api/tests/integration/safety.report-critical.integration.test.ts`
+- [ ] T069 [P] [US6] Add integration test for non-critical report behavior in
+      `api/tests/integration/safety.report-noncritical.integration.test.ts`
+- [ ] T070 [P] [US6] Add integration test for evidence MIME and size validation
+      in `api/tests/integration/safety.evidence.integration.test.ts`
+- [ ] T093 [P] [US6] Add integration test validating randomized evidence storage
+      key generation and raw filename stripping in
+      `api/tests/integration/safety.evidence-storage.integration.test.ts`
+
+### Implementation for User Story 6
+
+- [ ] T071 [US6] Implement incident report domain service with transaction
+      boundaries in `api/src/services/safetyIncidentService.ts`
+- [ ] T072 [P] [US6] Implement `POST /safety/incidents/report` endpoint in
+      `api/src/routes/safety.ts`
+- [ ] T073 [P] [US6] Implement evidence upload request validation endpoint in
+      `api/src/routes/safety.ts`
+- [ ] T092 [P] [US6] Implement non-guessable evidence storage key generation and
+      raw filename stripping in `api/src/services/safetyIncidentService.ts`
+- [ ] T074 [P] [US6] Implement safety report form UI in
+      `apps/mobile/passenger/src/screens/SafetyReportScreen.tsx`
+- [ ] T075 [P] [US6] Implement reporter notification on incident resolution in
+      `api/src/services/safetyIncidentService.ts`
+
+**Checkpoint**: US6 reporting and critical handling pipeline complete.
+
+---
+
+## Phase 9: User Story 7 - View Safety History and Follow-Up (Priority: P3)
+
+**Goal**: Provide authenticated, paginated, own-record-only safety history.
+
+**Independent Test**: `GET /safety/history` returns only caller-owned
+incidents/check-ins with correct pagination and resolution mapping.
+
+### Tests for User Story 7
+
+- [ ] T076 [P] [US7] Add contract test for `GET /safety/history` pagination in
+      `api/tests/contract/safety.history.contract.test.ts`
+- [ ] T077 [P] [US7] Add integration test for cross-user access isolation in
+      `api/tests/integration/safety.history-security.integration.test.ts`
+
+### Implementation for User Story 7
+
+- [ ] T078 [US7] Implement history query and DTO mapping service in
+      `api/src/services/safetyHistoryService.ts`
+- [ ] T079 [P] [US7] Implement `GET /safety/history` endpoint in
+      `api/src/routes/safety.ts`
+- [ ] T080 [P] [US7] Implement safety history screen in
+      `apps/mobile/passenger/src/screens/SafetyHistoryScreen.tsx`
+- [ ] T081 [P] [US7] Implement safety history screen in
+      `apps/mobile/driver/src/screens/SafetyHistoryScreen.tsx`
+
+**Checkpoint**: US7 transparent history and follow-up workflow complete.
+
+---
+
+## Phase 10: Admin Safety Queue and Operations
+
+**Purpose**: Safety-team triage and resolution workflow for operational
+readiness.
+
+- [ ] T082 Implement `GET /admin/safety/incidents` queue endpoint in
+      `api/src/routes/admin/safety.ts`
+- [ ] T083 [P] Implement `PATCH /admin/safety/incidents/:id` resolution endpoint
+      in `api/src/routes/admin/safety.ts`
+- [ ] T084 [P] Add integration test for admin incident status transitions in
+      `api/tests/integration/safety.admin-queue.integration.test.ts`
+
+---
+
+## Final Phase: Polish and Cross-Cutting Concerns
+
+- [ ] T085 [P] Add rate limiting for SOS and test-alert endpoints in
+      `api/src/middleware/rateLimit.ts`
+- [ ] T086 [P] Add redaction guard for share tokens in request/error logging in
+      `api/src/middleware/requestLogger.ts`
+- [ ] T087 [P] Add end-to-end checklist alignment tests for success criteria
+      SC-001..SC-008 in `api/tests/e2e/safety.success-criteria.e2e.test.ts`
+- [ ] T088 [P] Add latency/performance test for SOS and SSE timing budgets in
+      `api/tests/perf/safety.latency.perf.test.ts`
+- [ ] T089 [P] Update feature runbook and operational alerts in
+      `docs/runbooks/safety-system.md`
+- [ ] T090 Run quickstart verification scenarios and document observed outputs
+      in `specs/010-safety-system/quickstart.md`
+
+---
+
+## Dependencies and Execution Order
+
+### Phase Dependencies
+
+- Phase 1 -> Phase 2 -> User Story phases (Phase 3 onward)
+- Phase 10 depends on US1 and US6 incident workflows
+- Final phase depends on all story phases targeted for release
+
+### User Story Dependencies
+
+- US1 depends on Phase 2 (SMS/websocket foundation)
+- US2 depends on Phase 2 (token, SSE, logging safeguards)
+- US3 depends on Phase 2 (secret/env and reference utilities)
+- US4 depends on Phase 2 (phone normalization, outbox)
+- US5 depends on Phase 2 and benefits from US4 contacts for escalation dispatch
+- US6 depends on Phase 1 schema and Phase 2 errors/events
+- US7 depends on US1/US5/US6 data existing
+
+---
+
+## Parallel Opportunities
+
+- Phase 1: T002, T003, T006 can run in parallel
+- Phase 2: T009, T011, T012, T013 can run in parallel
+- US1 tests T019-T022 plus T091 can run in parallel; UI tasks T026-T028 can run
+  in parallel
+- US2 tests T029-T033 can run in parallel; route handlers T035-T038 can run in
+  parallel
+- US3 tests T041-T043 can run in parallel; UI tasks T047-T048 can run in
+  parallel
+- US4 tests T049-T051 can run in parallel; mobile UI tasks T055-T056 can run in
+  parallel
+- US5 tests T057-T061 can run in parallel; service tasks T063-T066 can run in
+  parallel
+- US6 tests T067-T070 plus T093 can run in parallel; implementation tasks
+  T072-T075 plus T092 can run in parallel
+- US7 tasks T080-T081 can run in parallel
+- Final phase tasks T085-T089 can run in parallel
+
+---
+
+## Parallel Example: User Story 1
+
+```bash
+# Parallel tests
+T019 api/tests/contract/safety.sos.contract.test.ts
+T020 api/tests/integration/safety.sos.integration.test.ts
+T021 api/tests/integration/safety.sos-dedup.integration.test.ts
+T022 api/tests/integration/safety.sos-websocket.integration.test.ts
+
+# Parallel implementation tasks
+T026 apps/mobile/passenger/src/screens/ActiveTrip/SafetyPanel.tsx
+T027 apps/mobile/passenger/src/hooks/useSilentSOS.ts
+T028 apps/mobile/driver/src/screens/ActiveTrip/SafetyPanel.tsx
 ```
-Phase 1 (Schema) → Phase 2 (SMS pipeline) → Phase 3 (US1 SOS)
-US4 (contacts) must be set up before US1 SOS has SMS recipients (but can be built in parallel with US1 — just not fully tested)
-US2 (trip share) independent of US1 after Phase 1
-US3 (vehicle verify) independent of US1 after Phase 1
-US5 (check-ins) depends on Phase 2 (escalation worker)
-US6 (incident report) independent after Phase 1
-US7 (history) depends on Phase 3 (incidents must exist)
-```
 
-## Parallel Execution Examples
-
-- T002 + T003 + T004 can run in parallel (separate table definitions)
-- T007 + T009 can run in parallel (Twilio adapter vs check-in worker)
-- T014 + T015 + T016 can run in parallel (rider SafetyPanel, silentSOS, driver
-  SafetyPanel)
-- T028 + T030 can run in parallel (route deviation vs stop/speed anomaly)
-- T034 + T035 + T036 + T037 can run in parallel (report endpoint vs evidence vs
-  UI)
+---
 
 ## Implementation Strategy
 
-- **MVP**: Phase 1 + Phase 2 + Phase 3 + Phase 4 (T001–T019) — SOS + contact
-  management (core safety is live)
-- **MVP+**: Add Phase 5 + Phase 6 (T020–T027) — trip sharing + vehicle
-  verification
-- **Full P2**: Add Phase 7 + 8 + 10 (T028–T040) — automated check-ins + incident
-  reporting + admin queue
-- **Complete**: Add Phase 9 + Polish (T038, T041–T043)
+### MVP First
 
-**Total tasks**: 43 | **Parallelizable**: 22 | **User stories**: 7
+1. Complete Phase 1 and Phase 2
+2. Complete US1 and US4 (core SOS + contact recipients)
+3. Validate SOS timing and dedup acceptance criteria
+
+### Incremental Delivery
+
+1. Add US2 and US3 next (preventive safety layers)
+2. Add US5 and US6 (automated safety + formal reporting)
+3. Add US7 and Admin queue
+4. Finish polish/perf/security hardening
+
+### Suggested MVP Scope
+
+- T001-T028 plus T052-T056
+
+---
+
+## Validation Summary
+
+- Total tasks: 93
+- User story task counts: - US1: 11 tasks - US2: 12 tasks - US3: 8 tasks - US4:
+  8 tasks - US5: 10 tasks - US6: 11 tasks - US7: 6 tasks
+- Parallelizable tasks (`[P]`): 72
+- Format validation: all tasks use
+  `- [ ] T### [P?] [US?] Description with file path`

@@ -405,8 +405,8 @@ a summary DTO, without touching trip data or other users' records.
 - **FR-003**: Upon SOS activation, every active `safetyContact` for the
   triggering user MUST receive an SMS within 30 seconds containing: the
   counterpart's (driver or passenger) first name and vehicle plate, the current
-  GPS location formatted as a Google Maps URL, and the live share link if one
-  exists.
+  GPS location formatted as an OSM-compatible coordinate link (or Hakwa
+  live-share URL), and the live share link if one exists.
 - **FR-004**: Upon SOS activation, a `safety.sos_triggered` event MUST be
   emitted on the platform's safety WebSocket channel within 5 seconds, carrying
   the full incident payload.
@@ -434,11 +434,11 @@ a summary DTO, without touching trip data or other users' records.
 - **FR-012**: The safety code shown on both driver and passenger screens MUST be
   derived deterministically:
   `HMAC-SHA256(bookingId + ISO-date, SAFETY_CODE_SECRET)` truncated to 4 decimal
-  digits. It MUST NOT require an API call — clients derive it locally with the
-  secret baked in at build time (environment variable).
-- **FR-013**: Route-deviation anomaly monitoring MUST run as a background worker
-  polling active-trip telemetry. Deviation threshold: >500 m from the planned
-  route for >2 consecutive minutes. Polling interval: 30 seconds.
+  digits. Derivation MUST use a server-held secret; clients MUST never receive
+  or embed `SAFETY_CODE_SECRET`.
+- **FR-013**: Route-deviation anomaly monitoring MUST run on each active-trip
+  telemetry update during `in_progress` trips. Deviation threshold: >500 m from
+  the planned route for >2 consecutive minutes.
 - **FR-014**: Prolonged-stop anomaly: vehicle stationary (speed < 3 km/h) for
   > 8 minutes outside the pickup or drop-off geofence (100 m radius).
 - **FR-015**: Speed anomaly: vehicle speed >130 km/h for >30 consecutive
@@ -526,4 +526,4 @@ a summary DTO, without touching trip data or other users' records.
 - **SC-007**: Zero cross-user data leaks from `GET /safety/history` or
   `GET /safety/share/:token` — validated by security tests.
 - **SC-008**: Safety code shown on passenger and driver screens is identical for
-  the same booking, with zero server round-trips required.
+  the same booking, with no client-side secret exposure.

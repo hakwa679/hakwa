@@ -20,6 +20,7 @@ export type PointsSourceAction =
   | "referral_signup"
   | "referral_trip"
   | "badge_earned"
+  | "streak_bonus"
   | "streak_milestone_7"
   | "streak_milestone_30"
   | "review_submitted"

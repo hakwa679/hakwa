@@ -1,4 +1,8 @@
 import type {
+  MapLeaderboardResponse,
+  MapMissionsResponse,
+  MapMissionProgressResponse,
+  MapZoneDetailResponse,
   MapStatsResponse,
   MapFeatureInput,
   MapFeatureResponse,
@@ -34,6 +38,12 @@ export class MapClient {
     if (query.featureType) {
       params.set("featureType", query.featureType);
     }
+    if (typeof query.maxAgeDays === "number" && query.maxAgeDays > 0) {
+      params.set("maxAgeDays", String(query.maxAgeDays));
+    }
+    if (query.sort) {
+      params.set("sort", query.sort);
+    }
 
     return this.client.get<PendingMapFeaturesResponse>(
       `/api/v1/map/features/pending?${params.toString()}`,
@@ -52,5 +62,28 @@ export class MapClient {
 
   getMyMapStats(): Promise<MapStatsResponse> {
     return this.client.get<MapStatsResponse>("/api/v1/map/stats/me");
+  }
+
+  getLeaderboard(month?: string): Promise<MapLeaderboardResponse> {
+    const suffix = month ? `?month=${encodeURIComponent(month)}` : "";
+    return this.client.get<MapLeaderboardResponse>(
+      `/api/v1/map/leaderboard${suffix}`,
+    );
+  }
+
+  getCurrentMissions(): Promise<MapMissionsResponse> {
+    return this.client.get<MapMissionsResponse>("/api/v1/map/missions");
+  }
+
+  getMyMissionProgress(): Promise<MapMissionProgressResponse> {
+    return this.client.get<MapMissionProgressResponse>(
+      "/api/v1/map/missions/me",
+    );
+  }
+
+  getZoneDetail(zoneId: string): Promise<MapZoneDetailResponse> {
+    return this.client.get<MapZoneDetailResponse>(
+      `/api/v1/map/zones/${zoneId}`,
+    );
   }
 }

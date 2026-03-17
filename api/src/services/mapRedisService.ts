@@ -7,6 +7,10 @@ export function getMapLeaderboardKey(date = new Date()): string {
   return `map:leaderboard:monthly:${year}-${month}`;
 }
 
+export function getMapLeaderboardArchiveKey(month: string): string {
+  return `map:leaderboard:monthly:${month}:archive`;
+}
+
 export function getMapActiveLayerCacheKey(): string {
   return "map:active:geojson";
 }
@@ -43,6 +47,17 @@ export async function setZoneCompletionPercent(
   percent: number,
 ): Promise<void> {
   await redis.set(getMapZonePercentKey(zoneId), percent.toFixed(2));
+}
+
+export async function getZoneCompletionPercent(
+  zoneId: string,
+): Promise<number | null> {
+  const value = await redis.get(getMapZonePercentKey(zoneId));
+  if (value === null) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export async function refreshActiveMapGeoJsonCache(): Promise<string> {

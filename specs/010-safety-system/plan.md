@@ -23,13 +23,13 @@ polling worker every 15 seconds.
 | Concern                   | Resolution                                                                                                                  |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | SOS activation latency    | DB INSERT + Redis Stream publish in single request; SMS is async                                                            |
-| Duplicate SOS prevention  | Application-level idempotency: check `(tripId, type='sos', status='active')` before insert                                  |
+| Duplicate SOS prevention  | Redis TTL idempotency key `safety:sos_dedup:<tripId>` (60s); return existing incident with `200` and no duplicate SMS       |
 | Silent SOS path           | `react-native-volume-manager` (Android) + iOS bridge; same endpoint with `silent: true`                                     |
 | SMS provider              | Twilio adapter behind `SmsService` interface in `@hakwa/notifications`                                                      |
 | Route deviation detection | Per-location-update polyline distance check; Redis counter `deviation:{tripId}`                                             |
 | Check-in escalation       | Polling worker in `@hakwa/workers`, 15s interval; escalates after 90s                                                       |
 | Trip share token          | `crypto.randomBytes(16).toString('hex')` — 128-bit entropy; never logged                                                    |
-| Driver suspension         | `merchant.status = 'suspended_pending_review'` on critical incident resolution; atomic with incident update                 |
+| Driver suspension         | `merchant.status = 'suspended_pending_review'` on critical incident report submission; atomic with incident insert          |
 | DB schema                 | 4 new tables: `safetyIncident`, `safetyContact`, `tripShare`, `safetyCheckIn` in `pkg/db/schema/safety.ts`                  |
 | Package placement         | Route handlers → `api/src/routes/safety.ts`; service logic → `api/src/services/safetyService.ts`; worker → `@hakwa/workers` |
 
@@ -46,7 +46,7 @@ polling worker every 15 seconds.
 | V. Redis pub/sub real-time  | FR-005 | [x]    | `redis.publish('safety:sos', ...)` on SOS trigger; WebSocket server relays to safety team channel                                                                           |
 | VI. Redis Stream async work | FR-006 | [x]    | SMS dispatch via `safety:sms:outbox` Redis Stream; check-in escalation via polling worker                                                                                   |
 | VII. Gamification hooks     | FR-007 | [x]    | No gamification for safety events by design — no points awarded for triggering SOS                                                                                          |
-| VIII. Idempotency           | FR-008 | [x]    | SOS: application-level check before insert; formal reports: `UNIQUE(tripId, reporterId, type)`                                                                              |
+| VIII. Idempotency           | FR-008 | [x]    | SOS: Redis TTL dedup key `safety:sos_dedup:<tripId>` with 60-second idempotency window; formal reports: `UNIQUE(tripId, reporterId, type)`                                  |
 | IX. Cursor pagination       | FR-009 | [x]    | `GET /incidents` paginates by `createdAt` cursor                                                                                                                            |
 | X. Worker CPU offload       | FR-010 | [x]    | Check-in escalation polling worker in `@hakwa/workers`; SMS worker also in workers package                                                                                  |
 | XI. AppError codes          | FR-011 | [x]    | All 13 error codes defined in contracts/rest-api.md; registered in `@hakwa/errors`                                                                                          |
@@ -87,7 +87,7 @@ api/
 
 apps/
   mobile/
-    rider/
+    passenger/
       src/
         screens/
           ActiveTrip/
@@ -101,5 +101,5 @@ apps/
       src/
         screens/
           ActiveTrip/
-            SafetyPanel.tsx    ← mirror of rider panel with driver-specific framing
+            SafetyPanel.tsx    ← mirror of passenger panel with driver-specific framing
 ```

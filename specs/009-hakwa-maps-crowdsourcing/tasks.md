@@ -265,24 +265,24 @@ signals independent of transport badges.
 
 ### Tests for User Story 4
 
-- [ ] T049 [P] [US4] Add badge evaluation unit tests for map milestones in
+- [x] T049 [P] [US4] Add badge evaluation unit tests for map milestones in
       `workers/src/__tests__/mapBadges.test.ts`
-- [ ] T050 [P] [US4] Add integration tests for idempotent `user_badge` writes in
+- [x] T050 [P] [US4] Add integration tests for idempotent `user_badge` writes in
       `api/tests/integration/map.badges.integration.test.ts`
-- [ ] T050A [P] [US4] Add integration tests for 7-day map streak bonus award
+- [x] T050A [P] [US4] Add integration tests for 7-day map streak bonus award
       idempotency in `api/tests/integration/map.streak.integration.test.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T051 [US4] Seed map badge definitions for passenger/operator actor types
+- [x] T051 [US4] Seed map badge definitions for passenger/operator actor types
       in `pkg/db/seeds/mapBadges.ts`
-- [ ] T052 [US4] Extend badge evaluation pipeline for map milestones in
+- [x] T052 [US4] Extend badge evaluation pipeline for map milestones in
       `workers/src/processors/badgeProcessor.ts`
-- [ ] T053 [P] [US4] Implement map badge notification payload adapters in
+- [x] T053 [P] [US4] Implement map badge notification payload adapters in
       `pkg/notifications/src/templates/mapBadges.ts`
-- [ ] T054 [US4] Wire badge award side effects from map events in
+- [x] T054 [US4] Wire badge award side effects from map events in
       `workers/src/processors/gamificationProcessor.ts`
-- [ ] T054A [US4] Implement map streak progression and `MAP_POINTS_MAP_STREAK_7`
+- [x] T054A [US4] Implement map streak progression and `MAP_POINTS_MAP_STREAK_7`
       bonus award (`streak_bonus`) in
       `workers/src/processors/gamificationProcessor.ts`
 
@@ -299,20 +299,20 @@ through leaderboard API independent of feature activation.
 
 ### Tests for User Story 5
 
-- [ ] T055 [P] [US5] Add contract tests for `GET /api/v1/map/leaderboard` in
+- [x] T055 [P] [US5] Add contract tests for `GET /api/v1/map/leaderboard` in
       `api/tests/contract/map.leaderboard.contract.test.ts`
-- [ ] T056 [P] [US5] Add integration tests for monthly rollover and caller rank
+- [x] T056 [P] [US5] Add integration tests for monthly rollover and caller rank
       card in `api/tests/integration/map.leaderboard.integration.test.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T057 [US5] Implement leaderboard score write-through from map points
+- [x] T057 [US5] Implement leaderboard score write-through from map points
       events in `workers/src/processors/gamificationProcessor.ts`
-- [ ] T058 [US5] Implement `GET /api/v1/map/leaderboard` endpoint in
+- [x] T058 [US5] Implement `GET /api/v1/map/leaderboard` endpoint in
       `api/src/routes/map.ts`
-- [ ] T059 [P] [US5] Implement leaderboard enrichment query (display name,
+- [x] T059 [P] [US5] Implement leaderboard enrichment query (display name,
       counts) in `api/src/services/mapLeaderboardService.ts`
-- [ ] T060 [US5] Implement monthly leaderboard rollover/archive scheduler in
+- [x] T060 [US5] Implement monthly leaderboard rollover/archive scheduler in
       `api/src/jobs/mapLeaderboardRolloverJob.ts`
 
 **Checkpoint**: US5 independently functional and testable.
@@ -329,21 +329,21 @@ for novel kilometers.
 
 ### Tests for User Story 7
 
-- [ ] T061 [P] [US7] Add worker unit tests for novel-km detection and daily cap
+- [x] T061 [P] [US7] Add worker unit tests for novel-km detection and daily cap
       in `workers/src/__tests__/mapRoadTraceProcessor.test.ts`
-- [ ] T062 [P] [US7] Add integration tests for opt-in/opt-out behavior on trip
+- [x] T062 [P] [US7] Add integration tests for opt-in/opt-out behavior on trip
       completion hook in
       `api/tests/integration/map.roadtrace.integration.test.ts`
 
 ### Implementation for User Story 7
 
-- [ ] T063 [US7] Publish trip-completed tracing job for opted-in drivers in
+- [x] T063 [US7] Publish trip-completed tracing job for opted-in drivers in
       `api/src/services/tripLifecycleService.ts`
-- [ ] T064 [US7] Implement road trace processor (RDP simplify + novel-km calc)
+- [x] T064 [US7] Implement road trace processor (RDP simplify + novel-km calc)
       in `workers/src/processors/mapRoadTraceProcessor.ts`
-- [ ] T065 [P] [US7] Persist processed traces and awarded points in
+- [x] T065 [P] [US7] Persist processed traces and awarded points in
       `api/src/services/mapRoadTraceService.ts`
-- [ ] T066 [US7] Implement post-trip tracing toast notification dispatch in
+- [x] T066 [US7] Implement post-trip tracing toast notification dispatch in
       `pkg/notifications/src/templates/mapRoadTrace.ts`
 
 **Checkpoint**: US7 independently functional and testable.
@@ -360,20 +360,20 @@ mission-complete bonus points.
 
 ### Tests for User Story 8
 
-- [ ] T067 [P] [US8] Add contract tests for mission endpoints in
+- [x] T067 [P] [US8] Add contract tests for mission endpoints in
       `api/tests/contract/map.missions.contract.test.ts`
-- [ ] T068 [P] [US8] Add integration tests for mission completion and expiry
+- [x] T068 [P] [US8] Add integration tests for mission completion and expiry
       behavior in `api/tests/integration/map.missions.integration.test.ts`
 
 ### Implementation for User Story 8
 
-- [ ] T069 [US8] Implement weekly mission creation scheduler in
+- [x] T069 [US8] Implement weekly mission creation scheduler in
       `api/src/jobs/mapWeeklyMissionJob.ts`
-- [ ] T070 [US8] Implement mission progress updater on map actions in
+- [x] T070 [US8] Implement mission progress updater on map actions in
       `api/src/services/mapMissionService.ts`
-- [ ] T071 [P] [US8] Implement mission endpoints (`GET /missions`,
+- [x] T071 [P] [US8] Implement mission endpoints (`GET /missions`,
       `GET /missions/me`) in `api/src/routes/map.ts`
-- [ ] T072 [US8] Implement mission completion/expiry notifications and bonus
+- [x] T072 [US8] Implement mission completion/expiry notifications and bonus
       points dispatch in `workers/src/processors/mapMissionProcessor.ts`
 
 **Checkpoint**: US8 independently functional and testable.
@@ -390,26 +390,26 @@ without dependence on leaderboard/badges.
 
 ### Tests for User Story 6
 
-- [ ] T073 [P] [US6] Add contract tests for pending browse query params in
+- [x] T073 [P] [US6] Add contract tests for pending browse query params in
       `api/tests/contract/map.pendingBrowse.contract.test.ts`
-- [ ] T074 [P] [US6] Add integration tests for pagination, sort order, and
+- [x] T074 [P] [US6] Add integration tests for pagination, sort order, and
       filters in `api/tests/integration/map.pendingBrowse.integration.test.ts`
 
 ### Implementation for User Story 6
 
-- [ ] T075 [US6] Implement pending browse query service with bbox/type/age
+- [x] T075 [US6] Implement pending browse query service with bbox/type/age
       filters in `api/src/services/mapQueryService.ts`
-- [ ] T076 [P] [US6] Add map pending list and filter state hooks in
+- [x] T076 [P] [US6] Add map pending list and filter state hooks in
       `pkg/api-client/src/hooks/useMapPendingFeatures.ts`
-- [ ] T077 [P] [US6] Implement passenger app community map list/card flow in
+- [x] T077 [P] [US6] Implement passenger app community map list/card flow in
       `apps/mobile/passenger/src/features/map/CommunityMapScreen.tsx`
-- [ ] T078 [US6] Implement driver app swipe-to-verify flow in
+- [x] T078 [US6] Implement driver app swipe-to-verify flow in
       `apps/mobile/driver/src/features/map/CommunityMapScreen.tsx`
-- [ ] T078A [P] [US6] Implement Rider Web Portal Explore and Map Fiji entry
+- [x] T078A [P] [US6] Implement Rider Web Portal Explore and Map Fiji entry
       point in `apps/web/src/features/map/ExploreMapEntry.tsx`
-- [ ] T078B [US6] Wire rider web route and navigation for Explore and Map Fiji
+- [x] T078B [US6] Wire rider web route and navigation for Explore and Map Fiji
       in `apps/web/src/router/index.tsx`
-- [ ] T078C [P] [US6] Add web integration test for entry-point visibility and
+- [x] T078C [P] [US6] Add web integration test for entry-point visibility and
       navigation in
       `apps/web/src/features/map/__tests__/ExploreMapEntry.test.tsx`
 
@@ -427,19 +427,19 @@ percent independent of mission/tracing systems.
 
 ### Tests for User Story 9
 
-- [ ] T079 [P] [US9] Add integration tests for zone percentage updates and
+- [x] T079 [P] [US9] Add integration tests for zone percentage updates and
       50/100% triggers in
       `api/tests/integration/map.zoneProgress.integration.test.ts`
-- [ ] T080 [P] [US9] Add contract tests for zone detail endpoint in
+- [x] T080 [P] [US9] Add contract tests for zone detail endpoint in
       `api/tests/contract/map.zone.contract.test.ts`
 
 ### Implementation for User Story 9
 
-- [ ] T081 [US9] Implement zone progress update handler on feature activation in
+- [x] T081 [US9] Implement zone progress update handler on feature activation in
       `api/src/services/mapZoneService.ts`
-- [ ] T082 [P] [US9] Implement zone percentage cache updates in
+- [x] T082 [P] [US9] Implement zone percentage cache updates in
       `api/src/services/mapRedisService.ts`
-- [ ] T083 [US9] Implement zone detail endpoint with top-3 contributors in
+- [x] T083 [US9] Implement zone detail endpoint with top-3 contributors in
       `api/src/routes/map.ts`
 
 **Checkpoint**: US9 independently functional and testable.
@@ -456,18 +456,18 @@ pioneer bonus exactly once in race-safe manner.
 
 ### Tests for User Story 10
 
-- [ ] T084 [P] [US10] Add concurrency tests for race-safe pioneer award in
+- [x] T084 [P] [US10] Add concurrency tests for race-safe pioneer award in
       `api/tests/integration/map.pioneer.concurrency.test.ts`
-- [ ] T085 [P] [US10] Add integration tests for explorer badge after 3 pioneered
+- [x] T085 [P] [US10] Add integration tests for explorer badge after 3 pioneered
       zones in `api/tests/integration/map.pioneer.integration.test.ts`
 
 ### Implementation for User Story 10
 
-- [ ] T086 [US10] Implement pioneer award logic on atomic zone increment in
+- [x] T086 [US10] Implement pioneer award logic on atomic zone increment in
       `api/src/services/mapZoneService.ts`
-- [ ] T087 [P] [US10] Implement pioneer/explorer badge trigger plumbing in
+- [x] T087 [P] [US10] Implement pioneer/explorer badge trigger plumbing in
       `workers/src/processors/badgeProcessor.ts`
-- [ ] T088 [US10] Implement pioneer label visibility rules for zone detail cards
+- [x] T088 [US10] Implement pioneer label visibility rules for zone detail cards
       in `api/src/services/mapZoneService.ts`
 
 **Checkpoint**: US10 independently functional and testable.
@@ -479,17 +479,17 @@ pioneer bonus exactly once in race-safe manner.
 **Purpose**: Hardening, documentation, performance checks, and end-to-end
 validation.
 
-- [ ] T089 [P] Add end-to-end map feature happy-path test (submit -> verify ->
+- [x] T089 [P] Add end-to-end map feature happy-path test (submit -> verify ->
       activate) in `api/tests/e2e/map.happyPath.e2e.test.ts`
-- [ ] T090 [P] Add load/perf benchmarks for submit and pending endpoints in
+- [x] T090 [P] Add load/perf benchmarks for submit and pending endpoints in
       `api/tests/perf/map.perf.test.ts`
-- [ ] T091 Add OpenAPI/request docs and response examples for map APIs in
+- [x] T091 Add OpenAPI/request docs and response examples for map APIs in
       `api/docs/map-api.md`
-- [ ] T092 Add quickstart verification updates and command list in
+- [x] T092 Add quickstart verification updates and command list in
       `specs/009-hakwa-maps-crowdsourcing/quickstart.md`
-- [ ] T093 Add operational runbook (jobs, Redis keys, moderation workflow) in
+- [x] T093 Add operational runbook (jobs, Redis keys, moderation workflow) in
       `docs/runbooks/map-crowdsourcing.md`
-- [ ] T094 Run full validation checklist and capture completion status in
+- [x] T094 Run full validation checklist and capture completion status in
       `specs/009-hakwa-maps-crowdsourcing/checklists/requirements.md`
 
 ---

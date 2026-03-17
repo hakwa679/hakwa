@@ -232,3 +232,39 @@ GET /api/map/features?minLat=-18.2&maxLat=-18.0&minLng=178.3&maxLng=178.6
 GET /api/me/gamification
 # → totalPoints includes map_contribution points
 ```
+
+---
+
+## Step 7: Validation Commands
+
+Run these from repository root:
+
+```bash
+# API runtime checks
+npx tsx api/src/index.ts
+
+# Worker package unit tests
+node --test pkg/workers/src/__tests__/mapBadges.test.ts
+node --test pkg/workers/src/__tests__/mapRoadTraceProcessor.test.ts
+
+# API map test slices
+node --test api/tests/contract/map.leaderboard.contract.test.ts
+node --test api/tests/contract/map.missions.contract.test.ts
+node --test api/tests/contract/map.zone.contract.test.ts
+node --test api/tests/integration/map.missions.integration.test.ts
+node --test api/tests/integration/map.zoneProgress.integration.test.ts
+```
+
+---
+
+## Step 8: Endpoint Smoke Checklist
+
+- `POST /api/v1/map/features`
+- `GET /api/v1/map/features/pending`
+- `POST /api/v1/map/features/:id/verify`
+- `GET /api/v1/map/features/active`
+- `GET /api/v1/map/stats/me`
+- `GET /api/v1/map/leaderboard`
+- `GET /api/v1/map/missions`
+- `GET /api/v1/map/missions/me`
+- `GET /api/v1/map/zones/:zoneId`

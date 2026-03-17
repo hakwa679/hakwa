@@ -318,6 +318,14 @@
 - [x] `GET /map/leaderboard` — monthly map leaderboard (top 50 + caller rank)
 - [x] `GET /map/stats/me` — caller stats including `mapStreak`,
       `rideImpactCount`, `trustTier`, `isMapBanned`
+
+---
+
+## Completion Status
+
+- [x] Map crowdsourcing implementation phases (US1-US11) merged.
+- [x] Remaining spec 009 task artifacts (tests, hooks, docs, runbooks) added.
+- [x] Final checklist sweep completed for task-level closure.
 - [x] `GET /map/missions` — current week missions with caller progress
 - [x] `GET /map/zones` — all zones with completion % and optional top
       contributors

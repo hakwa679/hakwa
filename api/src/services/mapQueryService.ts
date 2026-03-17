@@ -1,5 +1,5 @@
 import db from "@hakwa/db";
-import { mapFeature } from "@hakwa/db/schema";
+import { mapFeature, mapVerification, user } from "@hakwa/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { hasNearbyFeature } from "@hakwa/core";
 
@@ -42,9 +42,29 @@ export async function listPendingFeaturesInBbox(params: {
   minLng: number;
   maxLng: number;
   featureType?: string;
+  maxAgeDays?: number;
+  sort?: "oldest" | "newest" | "most_confirmed" | "most_disputed";
   limit?: number;
   offset?: number;
 }) {
+  const maxAgeDays =
+    typeof params.maxAgeDays === "number" && params.maxAgeDays > 0
+      ? Math.floor(params.maxAgeDays)
+      : undefined;
+  const ageClause =
+    typeof maxAgeDays === "number"
+      ? sql`AND created_at >= NOW() - (${maxAgeDays} * INTERVAL '1 day')`
+      : sql``;
+
+  const orderClause =
+    params.sort === "oldest"
+      ? sql`ORDER BY created_at ASC`
+      : params.sort === "most_confirmed"
+        ? sql`ORDER BY confirm_count DESC, created_at ASC`
+        : params.sort === "most_disputed"
+          ? sql`ORDER BY dispute_count DESC, created_at ASC`
+          : sql`ORDER BY created_at DESC`;
+
   const featureTypeClause = params.featureType
     ? sql`AND ${mapFeature.featureType} = ${params.featureType}`
     : sql``;
@@ -64,12 +84,83 @@ export async function listPendingFeaturesInBbox(params: {
       AND lat::numeric BETWEEN ${params.minLat} AND ${params.maxLat}
       AND lng::numeric BETWEEN ${params.minLng} AND ${params.maxLng}
       ${featureTypeClause}
-    ORDER BY created_at DESC
+      ${ageClause}
+    ${orderClause}
     LIMIT ${params.limit ?? 20}
     OFFSET ${params.offset ?? 0}
   `);
 
   return items.rows;
+}
+
+export async function getZoneTopContributors(zoneId: string) {
+  const rows = await db.execute(sql`
+    SELECT
+      f.contributor_id as "userId",
+      COALESCE(u.name, 'Anonymous') as "displayName",
+      COUNT(*)::int as "activeCount"
+    FROM map_feature f
+    LEFT JOIN "user" u ON u.id = f.contributor_id
+    WHERE f.zone_id = ${zoneId}
+      AND f.status = 'active'
+    GROUP BY f.contributor_id, u.name
+    ORDER BY COUNT(*) DESC, MIN(f.created_at) ASC
+    LIMIT 3
+  `);
+
+  return rows.rows as Array<{
+    userId: string;
+    displayName: string;
+    activeCount: number;
+  }>;
+}
+
+export async function getZonePendingVerificationCard(
+  userId: string,
+  featureId: string,
+) {
+  const [feature] = await db
+    .select({
+      id: mapFeature.id,
+      contributorId: mapFeature.contributorId,
+      status: mapFeature.status,
+      featureType: mapFeature.featureType,
+      title: mapFeature.title,
+      description: mapFeature.description,
+      lat: mapFeature.lat,
+      lng: mapFeature.lng,
+      createdAt: mapFeature.createdAt,
+    })
+    .from(mapFeature)
+    .where(eq(mapFeature.id, featureId))
+    .limit(1);
+
+  if (!feature) {
+    return undefined;
+  }
+
+  const [vote] = await db
+    .select({ id: mapVerification.id })
+    .from(mapVerification)
+    .where(
+      and(
+        eq(mapVerification.featureId, featureId),
+        eq(mapVerification.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  const [contributor] = await db
+    .select({ name: user.name })
+    .from(user)
+    .where(eq(user.id, feature.contributorId))
+    .limit(1);
+
+  return {
+    ...feature,
+    contributorDisplayName: contributor?.name ?? "Anonymous",
+    hasVoted: Boolean(vote),
+  };
 }
 
 export async function getFeatureForVerification(featureId: string): Promise<

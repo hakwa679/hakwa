@@ -4,12 +4,14 @@ import db from "@hakwa/db";
 import {
   badge,
   level,
+  mapContributorStats,
   pointsAccount,
   pointsLedger,
   referral,
   userBadge,
 } from "@hakwa/db/schema";
 import {
+  MAP_POINTS_MAP_STREAK_7,
   POINTS_PER_TRIP,
   STREAK_BONUS_7,
   STREAK_BONUS_30,
@@ -17,12 +19,14 @@ import {
 } from "@hakwa/core";
 import { redis } from "@hakwa/redis";
 import { sendNotification } from "@hakwa/notifications";
+import { awardMapMilestoneBadges } from "../processors/badgeProcessor.ts";
 
 type GamificationEventType =
   | "trip_completed"
   | "user_registered"
   | "first_trip_completed"
-  | "referral_used";
+  | "referral_used"
+  | "map_points_awarded";
 
 export interface GamificationEventPayload {
   type: GamificationEventType;
@@ -30,6 +34,16 @@ export interface GamificationEventPayload {
   tripId?: string;
   referralCode?: string;
   timestamp?: string;
+  points?: number;
+  sourceAction?:
+    | "map_contribution"
+    | "map_verification"
+    | "map_contribution_accepted"
+    | "map_photo_bonus"
+    | "map_road_trace"
+    | "map_mission_completed"
+    | "map_pioneer_bonus";
+  referenceId?: string;
 }
 
 function buildReferralCode(): string {
@@ -393,6 +407,177 @@ async function handleReferralUsed(_payload: {
   // Referral reward/cap handling is added in a later implementation slice.
 }
 
+function getMapLeaderboardKey(date = new Date()): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `map:leaderboard:monthly:${year}-${month}`;
+}
+
+function getFijiDateKey(now: Date): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Pacific/Fiji",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(now);
+}
+
+async function updateMapStreakAndBonus(userId: string): Promise<void> {
+  const [existing] = await db
+    .select()
+    .from(mapContributorStats)
+    .where(eq(mapContributorStats.userId, userId))
+    .limit(1);
+
+  const now = new Date();
+  const todayKey = getFijiDateKey(now);
+  const lastKey = existing?.mapStreakCheckpoint
+    ? getFijiDateKey(new Date(existing.mapStreakCheckpoint))
+    : null;
+
+  if (lastKey === todayKey) {
+    return;
+  }
+
+  let nextStreak = 1;
+  if (existing?.mapStreakCheckpoint) {
+    const last = new Date(existing.mapStreakCheckpoint);
+    const diffMs = now.getTime() - last.getTime();
+    nextStreak =
+      diffMs <= 36 * 60 * 60 * 1000 ? (existing.mapStreak ?? 0) + 1 : 1;
+  }
+
+  await db
+    .insert(mapContributorStats)
+    .values({
+      userId,
+      mapStreak: nextStreak,
+      mapStreakCheckpoint: now,
+    })
+    .onConflictDoUpdate({
+      target: mapContributorStats.userId,
+      set: {
+        mapStreak: nextStreak,
+        mapStreakCheckpoint: now,
+        updatedAt: now,
+      },
+    });
+
+  if (nextStreak !== 7) {
+    return;
+  }
+
+  const account = await ensurePointsAccount(userId);
+  const referenceId = `map-streak-7:${todayKey}`;
+
+  const [alreadyAwarded] = await db
+    .select({ id: pointsLedger.id })
+    .from(pointsLedger)
+    .where(
+      and(
+        eq(pointsLedger.accountId, account.id),
+        eq(pointsLedger.sourceAction, "streak_bonus"),
+        eq(pointsLedger.referenceId, referenceId),
+      ),
+    )
+    .limit(1);
+
+  if (alreadyAwarded) {
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.insert(pointsLedger).values({
+      accountId: account.id,
+      amount: MAP_POINTS_MAP_STREAK_7,
+      sourceAction: "streak_bonus",
+      referenceId,
+    });
+
+    await tx
+      .update(pointsAccount)
+      .set({
+        totalPoints: sql`${pointsAccount.totalPoints} + ${MAP_POINTS_MAP_STREAK_7}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(pointsAccount.id, account.id));
+  });
+}
+
+async function handleMapPointsAwarded(eventPayload: {
+  userId: string;
+  points?: number;
+  sourceAction?:
+    | "map_contribution"
+    | "map_verification"
+    | "map_contribution_accepted"
+    | "map_photo_bonus"
+    | "map_road_trace"
+    | "map_mission_completed"
+    | "map_pioneer_bonus";
+  referenceId?: string;
+}): Promise<void> {
+  const points = eventPayload.points ?? 0;
+  if (!Number.isFinite(points) || points <= 0 || !eventPayload.sourceAction) {
+    return;
+  }
+  const sourceAction = eventPayload.sourceAction;
+
+  const account = await ensurePointsAccount(eventPayload.userId);
+  await db.transaction(async (tx) => {
+    await tx.insert(pointsLedger).values({
+      accountId: account.id,
+      amount: points,
+      sourceAction,
+      referenceId: eventPayload.referenceId ?? null,
+    });
+
+    await tx
+      .update(pointsAccount)
+      .set({
+        totalPoints: sql`${pointsAccount.totalPoints} + ${points}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(pointsAccount.id, account.id));
+  });
+
+  await redis.zincrby(getMapLeaderboardKey(), points, eventPayload.userId);
+  await updateMapStreakAndBonus(eventPayload.userId);
+  await evaluateBadges(eventPayload.userId);
+
+  const mapMilestones = await awardMapMilestoneBadges(eventPayload.userId);
+  if (mapMilestones.awardedKeys.length > 0) {
+    const definitions = await db
+      .select({ key: badge.key, name: badge.name })
+      .from(badge)
+      .where(
+        sql`${badge.key} IN (${sql.join(
+          mapMilestones.awardedKeys.map((key) => sql`${key}`),
+          sql`,`,
+        )})`,
+      );
+
+    for (const awarded of mapMilestones.awardedKeys) {
+      const detail = definitions.find((row) => row.key === awarded);
+      await sendNotification(
+        eventPayload.userId,
+        "badge_earned",
+        {
+          channel: "in_app",
+          title: "New map badge unlocked",
+          body: `You earned the ${detail?.name ?? "Map milestone"} badge. Keep mapping Fiji!`,
+          data: {
+            badgeKey: awarded,
+            badgeName: detail?.name ?? "Map milestone",
+          },
+        },
+        `map_badge:${eventPayload.userId}:${awarded}`,
+      );
+    }
+  }
+}
+
 export async function processGamificationEvent(
   payload: GamificationEventPayload,
 ): Promise<void> {
@@ -408,6 +593,9 @@ export async function processGamificationEvent(
       return;
     case "referral_used":
       await handleReferralUsed(payload);
+      return;
+    case "map_points_awarded":
+      await handleMapPointsAwarded(payload);
       return;
     default:
       throw new Error(`Unsupported gamification event: ${payload.type}`);

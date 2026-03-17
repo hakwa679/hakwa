@@ -12,6 +12,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { assertNotMapBanned, getTrustTier } from "./mapSafetyService.ts";
 import { getFeatureForVerification } from "./mapQueryService.ts";
 import { applyFeatureVoteThresholds } from "./mapLifecycleService.ts";
+import { updateMissionProgressForAction } from "./mapMissionService.ts";
 
 export interface VerifyMapFeatureInput {
   vote: "confirm" | "dispute";
@@ -158,6 +159,11 @@ export async function verifyMapFeature(
       return updatedFeature;
     })
     .then(async () => {
+      await updateMissionProgressForAction({
+        userId,
+        actionType: "verify_feature",
+      });
+
       if (shouldEscalateToReview) {
         const [updated] = await db
           .update(mapFeature)

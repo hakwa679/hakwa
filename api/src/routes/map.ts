@@ -14,6 +14,12 @@ import {
 } from "../services/mapRedisService.ts";
 import { reportMapFeature } from "../services/mapModerationService.ts";
 import { getMyMapStats } from "../services/mapStatsService.ts";
+import { getMapLeaderboard } from "../services/mapLeaderboardService.ts";
+import {
+  listCurrentMissions,
+  listMyMissionProgress,
+} from "../services/mapMissionService.ts";
+import { getZoneDetail } from "../services/mapZoneService.ts";
 
 export const mapRouter = Router();
 
@@ -91,10 +97,17 @@ mapRouter.get(
         return;
       }
 
-      const minLat = Number(req.query["minLat"]);
-      const maxLat = Number(req.query["maxLat"]);
-      const minLng = Number(req.query["minLng"]);
-      const maxLng = Number(req.query["maxLng"]);
+      const bbox =
+        typeof req.query["bbox"] === "string" ? req.query["bbox"] : null;
+
+      const [bboxMinLat, bboxMinLng, bboxMaxLat, bboxMaxLng] = bbox
+        ? bbox.split(",").map((v) => Number(v.trim()))
+        : [Number.NaN, Number.NaN, Number.NaN, Number.NaN];
+
+      const minLat = Number(req.query["minLat"] ?? bboxMinLat);
+      const maxLat = Number(req.query["maxLat"] ?? bboxMaxLat);
+      const minLng = Number(req.query["minLng"] ?? bboxMinLng);
+      const maxLng = Number(req.query["maxLng"] ?? bboxMaxLng);
 
       if ([minLat, maxLat, minLng, maxLng].some((v) => Number.isNaN(v))) {
         res.status(422).json({
@@ -106,10 +119,32 @@ mapRouter.get(
 
       const limit = Number(req.query["limit"] ?? 20);
       const offset = Number(req.query["offset"] ?? 0);
-      const featureType =
+      const featureTypeParam =
         typeof req.query["featureType"] === "string"
           ? req.query["featureType"]
+          : typeof req.query["type"] === "string"
+            ? req.query["type"]
+            : undefined;
+      const featureType =
+        typeof featureTypeParam === "string" && featureTypeParam.length > 0
+          ? featureTypeParam
           : undefined;
+      const maxAgeDays = Number(req.query["maxAgeDays"] ?? 0);
+      const sort =
+        typeof req.query["sort"] === "string" ? req.query["sort"] : null;
+
+      const allowedSort: Array<
+        "oldest" | "newest" | "most_confirmed" | "most_disputed"
+      > = ["oldest", "newest", "most_confirmed", "most_disputed"];
+
+      if (sort && !allowedSort.includes(sort as (typeof allowedSort)[number])) {
+        res.status(422).json({
+          code: "MAP_INVALID_SORT",
+          message:
+            "sort must be oldest, newest, most_confirmed, or most_disputed.",
+        });
+        return;
+      }
 
       const items = await listPendingFeaturesInBbox({
         minLat,
@@ -117,6 +152,15 @@ mapRouter.get(
         minLng,
         maxLng,
         featureType,
+        maxAgeDays:
+          Number.isFinite(maxAgeDays) && maxAgeDays > 0
+            ? maxAgeDays
+            : undefined,
+        sort: (sort ?? "newest") as
+          | "oldest"
+          | "newest"
+          | "most_confirmed"
+          | "most_disputed",
         limit,
         offset,
       });
@@ -239,12 +283,10 @@ mapRouter.post(
           return;
         }
         if (code === "MAP_VOTING_CLOSED") {
-          res
-            .status(409)
-            .json({
-              code,
-              message: "Feature cannot be reported in current state.",
-            });
+          res.status(409).json({
+            code,
+            message: "Feature cannot be reported in current state.",
+          });
           return;
         }
         if (code === "MAP_FEATURE_NOT_FOUND") {
@@ -272,6 +314,114 @@ mapRouter.get(
       const stats = await getMyMapStats(session.user.id);
       res.status(200).json(stats);
     } catch (error) {
+      next(error);
+    }
+  },
+);
+
+mapRouter.get(
+  "/leaderboard",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const session = await getSessionFromRequest(req);
+      if (!session) {
+        res
+          .status(401)
+          .json({ code: "UNAUTHORIZED", message: "Authentication required." });
+        return;
+      }
+
+      const month =
+        typeof req.query["month"] === "string" ? req.query["month"] : undefined;
+
+      const leaderboard = await getMapLeaderboard(session.user.id, month);
+      res.status(200).json(leaderboard);
+    } catch (error) {
+      if (error instanceof Error && error.message === "MAP_INVALID_MONTH") {
+        res.status(422).json({
+          code: "MAP_INVALID_MONTH",
+          message: "month must be in YYYY-MM format.",
+        });
+        return;
+      }
+      next(error);
+    }
+  },
+);
+
+mapRouter.get(
+  "/missions",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const session = await getSessionFromRequest(req);
+      if (!session) {
+        res
+          .status(401)
+          .json({ code: "UNAUTHORIZED", message: "Authentication required." });
+        return;
+      }
+
+      const missions = await listCurrentMissions();
+      res.status(200).json({ items: missions });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+mapRouter.get(
+  "/missions/me",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const session = await getSessionFromRequest(req);
+      if (!session) {
+        res
+          .status(401)
+          .json({ code: "UNAUTHORIZED", message: "Authentication required." });
+        return;
+      }
+
+      const progress = await listMyMissionProgress(session.user.id);
+      res.status(200).json({ items: progress });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+mapRouter.get(
+  "/zones/:zoneId",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const session = await getSessionFromRequest(req);
+      if (!session) {
+        res
+          .status(401)
+          .json({ code: "UNAUTHORIZED", message: "Authentication required." });
+        return;
+      }
+
+      const zoneId = req.params["zoneId"];
+      if (!zoneId) {
+        res
+          .status(422)
+          .json({
+            code: "MAP_INVALID_ZONE_ID",
+            message: "zoneId is required.",
+          });
+        return;
+      }
+
+      const zone = await getZoneDetail(zoneId, session.user.id);
+      res.status(200).json(zone);
+    } catch (error) {
+      if (error instanceof Error && error.message === "MAP_ZONE_NOT_FOUND") {
+        res.status(404).json({
+          code: "MAP_ZONE_NOT_FOUND",
+          message: "Map zone not found.",
+        });
+        return;
+      }
       next(error);
     }
   },
