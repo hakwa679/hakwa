@@ -4,5 +4,6 @@
     // File Layout
     "rootDir": "./src",
     "outDir": "./dist"
-  }
+  },
+  "exclude": ["node_modules", "tests", "dist"]
 }

@@ -169,6 +169,8 @@ apps/
 pkg/
 ├── core/
 ├── db/
+├── types/
+├── api-client/
 ├── auth/
 ├── auth-client/
 ├── redis/

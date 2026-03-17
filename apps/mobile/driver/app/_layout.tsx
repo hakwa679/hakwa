@@ -16,6 +16,10 @@ import {
   routeNotificationData,
   routeNotificationPath,
 } from "@/constants/LinkingConfiguration";
+import {
+  startDriverMapQueueBootstrap,
+  stopDriverMapQueueBootstrap,
+} from "./bootstrap/mapQueueBootstrap";
 
 export const TOKEN_KEY = "hakwa_token";
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -28,7 +32,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const segments = useSegments();
-  const url = Linking.useURL();
+  const url = Linking.useLinkingURL();
 
   // null = loading, false = unauthenticated, true = authenticated
   const [authReady, setAuthReady] = useState<boolean | null>(null);
@@ -36,6 +40,13 @@ export default function RootLayout() {
   usePushRegistration((data) => {
     routeNotificationData(router, data);
   });
+
+  useEffect(() => {
+    startDriverMapQueueBootstrap(API_URL);
+    return () => {
+      stopDriverMapQueueBootstrap();
+    };
+  }, []);
 
   useEffect(() => {
     async function restoreSession() {
@@ -92,7 +103,7 @@ export default function RootLayout() {
       } else if (path?.includes("reset-password")) {
         router.push({ pathname: "/auth/reset-password", params: { token } });
       } else {
-        routeNotificationPath(router, path);
+        routeNotificationPath(router, path ?? undefined);
       }
     } catch {
       // Ignore deep link errors

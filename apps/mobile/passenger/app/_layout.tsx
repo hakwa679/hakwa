@@ -16,6 +16,10 @@ import {
   routeNotificationData,
   routeNotificationPath,
 } from "@/constants/LinkingConfiguration";
+import {
+  startPassengerMapQueueBootstrap,
+  stopPassengerMapQueueBootstrap,
+} from "./bootstrap/mapQueueBootstrap";
 
 export const TOKEN_KEY = "hakwa_token";
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -36,6 +40,13 @@ export default function RootLayout() {
   usePushRegistration((data) => {
     routeNotificationData(router, data);
   });
+
+  useEffect(() => {
+    startPassengerMapQueueBootstrap(API_URL);
+    return () => {
+      stopPassengerMapQueueBootstrap();
+    };
+  }, []);
 
   // Step 1: Restore session from SecureStore on launch
   useEffect(() => {

@@ -24,6 +24,9 @@ import { internalPayoutsRouter } from "./routes/internal/payouts.ts";
 import { tripsRouter } from "./routes/trips.ts";
 import { meGamificationRouter } from "./routes/meGamification.ts";
 import { startGamificationConsumer } from "./jobs/gamificationConsumer.ts";
+import { mapRouter } from "./routes/map.ts";
+import { mapUploadsRouter } from "./routes/mapUploads.ts";
+import { adminMapRouter } from "./routes/adminMap.ts";
 
 const server = express();
 const httpServer = createServer(server);
@@ -49,6 +52,9 @@ server.use("/api/merchant/payouts", merchantPayoutsRouter);
 server.use("/api/internal/payouts", internalPayoutsRouter);
 server.use("/api/trips", tripsRouter);
 server.use("/api/me/gamification", meGamificationRouter);
+server.use("/api/v1/map", mapRouter);
+server.use("/api/v1/map/uploads", mapUploadsRouter);
+server.use("/api/v1/admin/map", adminMapRouter);
 
 // WebSocket
 attachWebSocketServer(httpServer);

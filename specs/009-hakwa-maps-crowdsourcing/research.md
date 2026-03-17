@@ -129,3 +129,37 @@ audiences. Badge-award queries remain simple (`WHERE applicableTo = actorType`).
   additional branching in all badge evaluation logic and migration overhead.
 - Duplicate business logic per actor without duplicated rows: increases runtime
   complexity and makes badge filtering less explicit.
+
+---
+
+## Official Documentation Verification Log
+
+| Date (UTC) | Dependency/Tool | Version Target | Official Source                                             | Notes                                                                            |
+| ---------- | --------------- | -------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 2026-03-17 | Express         | 5.x (latest)   | https://expressjs.com/                                      | Router mounting and error middleware behavior reconfirmed for route scaffolding. |
+| 2026-03-17 | Drizzle ORM     | latest         | https://orm.drizzle.team/docs/overview                      | Schema definitions, unique/index patterns, and transaction API shape verified.   |
+| 2026-03-17 | ioredis         | latest         | https://github.com/redis/ioredis                            | Sorted-set leaderboard and key/TTL usage validated for map cache utilities.      |
+| 2026-03-17 | Expo NetInfo    | latest         | https://docs.expo.dev/versions/latest/sdk/netinfo/          | Offline queue reconnect strategy confirmed for planned mobile queue drain.       |
+| 2026-03-17 | AsyncStorage    | latest         | https://react-native-async-storage.github.io/async-storage/ | Persistent queue storage model verified for map contribution drafts.             |
+
+## Implementation Gate Notes
+
+- Story phases must not begin until related upstream docs are re-checked for
+  breaking API changes.
+- Any undocumented assumptions discovered during coding must be added to this
+  file before marking the related task complete.
+- If an official doc conflicts with `spec.md`, treat `spec.md` as product intent
+  and document the technical reconciliation decision.
+
+## Version/Source References
+
+- Express routing and middleware: https://expressjs.com/en/guide/routing.html
+- Express error handling: https://expressjs.com/en/guide/error-handling.html
+- Drizzle Postgres table/index docs:
+  https://orm.drizzle.team/docs/indexes-constraints
+- Drizzle transactions: https://orm.drizzle.team/docs/transactions
+- Redis sorted sets:
+  https://redis.io/docs/latest/develop/data-types/sorted-sets/
+- Expo NetInfo: https://docs.expo.dev/versions/latest/sdk/netinfo/
+- AsyncStorage usage:
+  https://react-native-async-storage.github.io/async-storage/docs/usage/

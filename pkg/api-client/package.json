@@ -1,0 +1,12 @@
+{
+    "name": "@hakwa/api-client",
+    "version": "1.0.0",
+    "type": "module",
+    "exports": {
+        ".": "./index.ts"
+    },
+    "types": "./index.ts",
+    "dependencies": {
+        "@hakwa/types": "*"
+    }
+}

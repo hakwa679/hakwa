@@ -21,22 +21,30 @@ and validation.
 
 **Purpose**: Initialize schema and shared map modules required by all stories.
 
-- [ ] T001 Create map schema module and base exports in `pkg/db/schema/map.ts`
-- [ ] T002 [P] Export map schema from root schema barrel in
+- [x] T001 Create map schema module and base exports in `pkg/db/schema/map.ts`
+- [x] T002 [P] Export map schema from root schema barrel in
       `pkg/db/schema/index.ts`
-- [ ] T003 [P] Add map action constants and Fiji bounds constants in
+- [x] T003 [P] Add map action constants and Fiji bounds constants in
       `pkg/core/src/gamificationConstants.ts`
-- [ ] T004 [P] Add geometry validation and precision helpers in
+- [x] T004 [P] Add geometry validation and precision helpers in
       `pkg/core/src/geometry/validate.ts`
-- [ ] T005 [P] Add Ramer-Douglas-Peucker simplification utility in
+- [x] T005 [P] Add Ramer-Douglas-Peucker simplification utility in
       `pkg/core/src/geometry/rdp.ts`
-- [ ] T006 [P] Add map request/response contracts for API and clients in
+- [x] T006 [P] Add map request/response contracts for API and clients in
       `pkg/types/src/map.ts`
-- [ ] T007 Register map routes placeholder and router mount in
+- [x] T006A [P] Create workspace package scaffold for shared types in
+      `pkg/types/package.json`
+- [x] T006B [P] Add shared types package entrypoint and exports in
+      `pkg/types/index.ts`
+- [x] T006C [P] Create workspace package scaffold for shared API client in
+      `pkg/api-client/package.json`
+- [x] T006D [P] Add shared API client entrypoint and exports in
+      `pkg/api-client/index.ts`
+- [x] T007 Register map routes placeholder and router mount in
       `api/src/index.ts`
-- [ ] T008 [P] Add map mission template definitions in
+- [x] T008 [P] Add map mission template definitions in
       `api/src/jobs/missionTemplates.ts`
-- [ ] T009 Add map zone seed script shell in `api/src/jobs/seedMapZones.ts`
+- [x] T009 Add map zone seed script shell in `api/src/jobs/seedMapZones.ts`
 
 ---
 
@@ -47,27 +55,42 @@ stories.
 
 **CRITICAL**: Complete this phase before any user story implementation.
 
-- [ ] T010 Define `map_feature`, `map_verification`, and `map_contributor_stats`
+- [x] T010 Define `map_feature`, `map_verification`, and `map_contributor_stats`
       tables in `pkg/db/schema/map.ts`
-- [ ] T011 [P] Define `map_zone`, `map_mission`, and `map_mission_progress`
+- [x] T011 [P] Define `map_zone`, `map_mission`, and `map_mission_progress`
       tables in `pkg/db/schema/map.ts`
-- [ ] T012 [P] Define `map_road_trace`, `map_feature_report`,
+- [x] T012 [P] Define `map_road_trace`, `map_feature_report`,
       `map_contributor_trust`, `map_moderation_log`, and `map_abuse_flag` tables
       in `pkg/db/schema/map.ts`
-- [ ] T013 Extend map points source actions in `pkg/db/schema/gamification.ts`
-- [ ] T014 Implement map safety and trust helpers (ban check, trust tier,
+- [x] T013 Extend map points source actions in `pkg/db/schema/gamification.ts`
+- [x] T014 Implement map safety and trust helpers (ban check, trust tier,
       content screening) in `api/src/services/mapSafetyService.ts`
-- [ ] T015 [P] Implement map repository data access layer with transactional
+- [x] T015 [P] Implement map repository data access layer with transactional
       helpers in `api/src/services/mapRepository.ts`
-- [ ] T016 [P] Implement Redis cache/leaderboard/zone key helpers in
+- [x] T016 [P] Implement Redis cache/leaderboard/zone key helpers in
       `api/src/services/mapRedisService.ts`
-- [ ] T017 Add map-specific error codes and mappers in
+- [x] T017 Add map-specific error codes and mappers in
       `pkg/errors/src/mapErrors.ts`
-- [ ] T018 Apply schema and verify migration state with db push docs update in
+- [x] T018 Apply schema and verify migration state with db push docs update in
       `pkg/db/README.md`
+- [x] T018A Create official-doc verification log for external dependencies and
+      tools in `specs/009-hakwa-maps-crowdsourcing/research.md`
+- [x] T018B Add implementation gate checklist requiring official-doc
+      confirmation before each story phase in
+      `specs/009-hakwa-maps-crowdsourcing/tasks.md`
+- [x] T018C [P] Add version/source references (Express, Drizzle, Redis, Expo
+      NetInfo, AsyncStorage) in `specs/009-hakwa-maps-crowdsourcing/research.md`
 
 **Checkpoint**: Foundation complete; user story phases can proceed in priority
 order or in parallel by team.
+
+### Official Documentation Gate (Required Before Each Story Phase)
+
+- [ ] Confirm relevant framework/library docs were reviewed and version-checked.
+- [ ] Record any behavior assumptions and API compatibility notes in
+      `research.md`.
+- [ ] Re-validate endpoint and schema decisions against the latest official
+      docs.
 
 ---
 
@@ -81,25 +104,44 @@ ledger updates, then appears in pending list for contributor.
 
 ### Tests for User Story 1
 
-- [ ] T019 [P] [US1] Add contract tests for `POST /api/v1/map/features` in
+- [x] T019 [P] [US1] Add contract tests for `POST /api/v1/map/features` in
       `api/tests/contract/map.submit.contract.test.ts`
-- [ ] T020 [P] [US1] Add integration tests for GPS accuracy, daily cap, and
+- [x] T020 [P] [US1] Add integration tests for GPS accuracy, daily cap, and
       photo bonus in `api/tests/integration/map.submit.integration.test.ts`
+- [x] T020A [P] [US1] Add contract tests ensuring binary photo payloads are
+      rejected and URL-only submissions are accepted in
+      `api/tests/contract/map.photoUpload.contract.test.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T021 [US1] Implement `POST /api/v1/map/features` handler in
+- [x] T021 [US1] Implement `POST /api/v1/map/features` handler in
       `api/src/routes/map.ts`
-- [ ] T022 [US1] Implement submission service transaction (feature insert +
+- [x] T022 [US1] Implement submission service transaction (feature insert +
       stats + points events) in `api/src/services/mapContributionService.ts`
-- [ ] T023 [P] [US1] Implement out-of-bounds and coordinate sanitization checks
+- [x] T023 [P] [US1] Implement out-of-bounds and coordinate sanitization checks
       in `api/src/services/mapValidationService.ts`
-- [ ] T024 [P] [US1] Implement duplicate proximity warning lookup logic in
+- [x] T024 [P] [US1] Implement duplicate proximity warning lookup logic in
       `api/src/services/mapQueryService.ts`
-- [ ] T025 [US1] Implement `GET /api/v1/map/features/pending`
+- [x] T025 [US1] Implement `GET /api/v1/map/features/pending`
       contributor-visible query in `api/src/routes/map.ts`
-- [ ] T026 [US1] Add map contribution client calls in shared API client in
+- [x] T026 [US1] Add map contribution client calls in shared API client in
       `pkg/api-client/src/mapClient.ts`
+- [x] T026E [P] [US1] Implement pre-upload endpoint for contribution photos and
+      signed upload response in `api/src/routes/mapUploads.ts`
+- [x] T026F [US1] Implement photo upload service (size validation + trusted URL
+      output) in `api/src/services/mapPhotoUploadService.ts`
+- [x] T026G [P] [US1] Add client pre-upload flow before submit in
+      `pkg/api-client/src/mapPhotoUploadClient.ts`
+- [x] T026A [P] [US1] Implement offline contribution queue storage and enqueue
+      API in `pkg/api-client/src/mapContributionQueue.ts`
+- [x] T026B [US1] Implement connectivity listener and queue drain on reconnect
+      for passenger app in
+      `apps/mobile/passenger/src/app/bootstrap/mapQueueBootstrap.ts`
+- [x] T026C [US1] Implement connectivity listener and queue drain on reconnect
+      for driver app in
+      `apps/mobile/driver/src/app/bootstrap/mapQueueBootstrap.ts`
+- [x] T026D [P] [US1] Add integration tests for offline enqueue and reconnect
+      replay in `api/tests/integration/map.offlineQueue.integration.test.ts`
 
 **Checkpoint**: US1 independently functional and testable.
 
@@ -115,23 +157,23 @@ and self-verification are blocked.
 
 ### Tests for User Story 2
 
-- [ ] T027 [P] [US2] Add contract tests for
+- [x] T027 [P] [US2] Add contract tests for
       `POST /api/v1/map/features/:id/verify` in
       `api/tests/contract/map.verify.contract.test.ts`
-- [ ] T028 [P] [US2] Add integration tests for double-vote and self-vote
+- [x] T028 [P] [US2] Add integration tests for double-vote and self-vote
       rejection in `api/tests/integration/map.verify.integration.test.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T029 [US2] Implement verify endpoint and request validation in
+- [x] T029 [US2] Implement verify endpoint and request validation in
       `api/src/routes/map.ts`
-- [ ] T030 [US2] Implement vote insert and idempotency enforcement in
+- [x] T030 [US2] Implement vote insert and idempotency enforcement in
       `api/src/services/mapVerificationService.ts`
-- [ ] T031 [P] [US2] Implement verification card feature detail query in
+- [x] T031 [P] [US2] Implement verification card feature detail query in
       `api/src/services/mapQueryService.ts`
-- [ ] T032 [P] [US2] Add verification calls in API client for mobile/web in
+- [x] T032 [P] [US2] Add verification calls in API client for mobile/web in
       `pkg/api-client/src/mapClient.ts`
-- [ ] T033 [US2] Add verification interaction hook for UI clients in
+- [x] T033 [US2] Add verification interaction hook for UI clients in
       `pkg/api-client/src/hooks/useMapVerification.ts`
 
 **Checkpoint**: US2 independently functional and testable.
@@ -148,22 +190,22 @@ transitions without relying on badges/leaderboard.
 
 ### Tests for User Story 3
 
-- [ ] T034 [P] [US3] Add integration tests for activation/rejection thresholds
+- [x] T034 [P] [US3] Add integration tests for activation/rejection thresholds
       in `api/tests/integration/map.lifecycle.integration.test.ts`
-- [ ] T035 [P] [US3] Add concurrency tests for atomic threshold transitions in
+- [x] T035 [P] [US3] Add concurrency tests for atomic threshold transitions in
       `api/tests/integration/map.lifecycle.concurrency.test.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T036 [US3] Implement threshold transition logic with row locking in
+- [x] T036 [US3] Implement threshold transition logic with row locking in
       `api/src/services/mapLifecycleService.ts`
-- [ ] T037 [P] [US3] Implement `GET /api/v1/map/features/active` GeoJSON
+- [x] T037 [P] [US3] Implement `GET /api/v1/map/features/active` GeoJSON
       endpoint in `api/src/routes/map.ts`
-- [ ] T038 [P] [US3] Implement active layer cache invalidation and refresh in
+- [x] T038 [P] [US3] Implement active layer cache invalidation and refresh in
       `api/src/services/mapRedisService.ts`
-- [ ] T039 [US3] Implement nightly stale transition job in
+- [x] T039 [US3] Implement nightly stale transition job in
       `api/src/jobs/mapStaleCleanupJob.ts`
-- [ ] T040 [US3] Implement re-open flow from active to pending with fresh vote
+- [x] T040 [US3] Implement re-open flow from active to pending with fresh vote
       slate in `api/src/services/mapLifecycleService.ts`
 
 **Checkpoint**: US3 independently functional and testable.
@@ -180,26 +222,34 @@ with no points; moderation actions transition status atomically with audit log.
 
 ### Tests for User Story 11
 
-- [ ] T041 [P] [US11] Add contract tests for report and moderation endpoints in
+- [x] T041 [P] [US11] Add contract tests for report and moderation endpoints in
       `api/tests/contract/map.moderation.contract.test.ts`
-- [ ] T042 [P] [US11] Add integration tests for pending_review withholding and
+- [x] T042 [P] [US11] Add integration tests for pending_review withholding and
       admin approval payout in
       `api/tests/integration/map.moderation.integration.test.ts`
 
 ### Implementation for User Story 11
 
-- [ ] T043 [US11] Implement `POST /api/v1/map/features/:id/report` endpoint in
+- [x] T043 [US11] Implement `POST /api/v1/map/features/:id/report` endpoint in
       `api/src/routes/map.ts`
-- [ ] T044 [US11] Implement moderator routes (`GET queue`, `POST moderate`) in
+- [x] T044 [US11] Implement moderator routes (`GET queue`, `POST moderate`) in
       `api/src/routes/adminMap.ts`
-- [ ] T045 [US11] Implement role guard middleware (`admin`/`map_moderator`) in
+- [x] T045 [US11] Implement role guard middleware (`admin`/`map_moderator`) in
       `api/src/middleware/requireMapModerator.ts`
-- [ ] T046 [P] [US11] Implement moderation state machine and atomic
+- [x] T046 [P] [US11] Implement moderation state machine and atomic
       status+ledger updates in `api/src/services/mapModerationService.ts`
-- [ ] T047 [P] [US11] Implement dispute-category instant escalation for
+- [x] T047 [P] [US11] Implement dispute-category instant escalation for
       trusted/senior users in `api/src/services/mapVerificationService.ts`
-- [ ] T048 [US11] Implement nightly abuse ring detector upsert job in
+- [x] T048 [US11] Implement nightly abuse ring detector upsert job in
       `api/src/jobs/mapAbuseCheckJob.ts`
+- [x] T048A [US11] Implement `GET /api/v1/map/stats/me` endpoint returning
+      `rideImpactCount` and `trustTier` in `api/src/routes/map.ts`
+- [x] T048B [P] [US11] Implement map stats aggregation service for
+      `rideImpactCount` and `mapStreak` in `api/src/services/mapStatsService.ts`
+- [x] T048C [P] [US11] Add contract tests for `GET /api/v1/map/stats/me`
+      response fields in `api/tests/contract/map.stats.contract.test.ts`
+- [x] T048D [US11] Add client query hook for map stats endpoint in
+      `pkg/api-client/src/hooks/useMapStats.ts`
 
 **Checkpoint**: US11 independently functional and testable.
 
@@ -219,6 +269,8 @@ signals independent of transport badges.
       `workers/src/__tests__/mapBadges.test.ts`
 - [ ] T050 [P] [US4] Add integration tests for idempotent `user_badge` writes in
       `api/tests/integration/map.badges.integration.test.ts`
+- [ ] T050A [P] [US4] Add integration tests for 7-day map streak bonus award
+      idempotency in `api/tests/integration/map.streak.integration.test.ts`
 
 ### Implementation for User Story 4
 
@@ -229,6 +281,9 @@ signals independent of transport badges.
 - [ ] T053 [P] [US4] Implement map badge notification payload adapters in
       `pkg/notifications/src/templates/mapBadges.ts`
 - [ ] T054 [US4] Wire badge award side effects from map events in
+      `workers/src/processors/gamificationProcessor.ts`
+- [ ] T054A [US4] Implement map streak progression and `MAP_POINTS_MAP_STREAK_7`
+      bonus award (`streak_bonus`) in
       `workers/src/processors/gamificationProcessor.ts`
 
 **Checkpoint**: US4 independently functional and testable.
@@ -350,6 +405,13 @@ without dependence on leaderboard/badges.
       `apps/mobile/passenger/src/features/map/CommunityMapScreen.tsx`
 - [ ] T078 [US6] Implement driver app swipe-to-verify flow in
       `apps/mobile/driver/src/features/map/CommunityMapScreen.tsx`
+- [ ] T078A [P] [US6] Implement Rider Web Portal Explore and Map Fiji entry
+      point in `apps/web/src/features/map/ExploreMapEntry.tsx`
+- [ ] T078B [US6] Wire rider web route and navigation for Explore and Map Fiji
+      in `apps/web/src/router/index.tsx`
+- [ ] T078C [P] [US6] Add web integration test for entry-point visibility and
+      navigation in
+      `apps/web/src/features/map/__tests__/ExploreMapEntry.test.tsx`
 
 **Checkpoint**: US6 independently functional and testable.
 

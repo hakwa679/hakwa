@@ -882,7 +882,7 @@ leaderboard systems.
   by concurrent-request integration tests.
 - **SC-006**: The 20-contributions-per-day-per-user rate limit is enforced with
   zero bypass in automated tests; the 201st request receives
-  `RATE_LIMIT_EXCEEDED` (HTTP 429).
+  `MAP_DAILY_LIMIT_REACHED` (HTTP 429).
 - **SC-007**: Badge evaluation and leaderboard updates complete asynchronously
   with zero blocking of the HTTP response — verified by asserting response
   return before background job completion in unit tests.

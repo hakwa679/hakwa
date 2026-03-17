@@ -12,7 +12,11 @@
     "scripts": {
         "db-push": "npm run push -w @hakwa/db",
         "api-dev": "npm run dev -w @hakwa/api",
-        "git-push": "git add . && git commit -m \"Latest_Changes\" && git push"
+        "git-push": "git add . && git commit -m \"Latest_Changes\" && git push",
+        "passenger-dev": "npm start -w @hakwa/passenger",
+        "merchant-dev": "npm start -w @hakwa/merchant",
+        "driver-dev": "npm start -w @hakwa/driver",
+        "web-dev": "npm run dev -w @hakwa/web"
     },
     "devDependencies": {
         "typescript": "^5.9.3"
