@@ -5,16 +5,12 @@ import {
   ledgerEntry,
   wallet,
   operator,
-  pointsAccount,
-  pointsLedger,
   HolderType,
 } from "@hakwa/db/schema";
 import { calculateFare, splitFare } from "@hakwa/core";
 import { sendNotification } from "@hakwa/notifications";
+import { redis } from "@hakwa/redis";
 import { notifyBalanceUpdated } from "./walletService.ts";
-
-/** Points awarded to driver on trip completion. */
-const TRIP_COMPLETION_POINTS = 50 as const;
 
 // ---------------------------------------------------------------------------
 // Error class
@@ -155,30 +151,21 @@ export async function completeTrip(
       tripId,
       description: `Trip earnings — trip ${tripId}`,
     });
-
-    // Insert gamification points for driver (if points account exists)
-    const [pointsAccRow] = await tx
-      .select({ id: pointsAccount.id, totalPoints: pointsAccount.totalPoints })
-      .from(pointsAccount)
-      .where(eq(pointsAccount.userId, driverId))
-      .limit(1);
-
-    if (pointsAccRow) {
-      await tx.insert(pointsLedger).values({
-        accountId: pointsAccRow.id,
-        amount: TRIP_COMPLETION_POINTS,
-        sourceAction: "trip_completed",
-        referenceId: tripId,
-      });
-      await tx
-        .update(pointsAccount)
-        .set({
-          totalPoints: pointsAccRow.totalPoints + TRIP_COMPLETION_POINTS,
-          updatedAt: new Date(),
-        })
-        .where(eq(pointsAccount.id, pointsAccRow.id));
-    }
   });
+
+  // Publish post-commit gamification event for passenger rewards.
+  await redis.xadd(
+    "gamification:events",
+    "*",
+    "type",
+    "trip_completed",
+    "userId",
+    tripRow.passengerId,
+    "tripId",
+    tripId,
+    "timestamp",
+    completedAt.toISOString(),
+  );
 
   // T011: Notify merchant wallet balance updated via Redis pub/sub
   if (operatorRow) {

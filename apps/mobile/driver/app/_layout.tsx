@@ -11,6 +11,11 @@ import * as Linking from "expo-linking";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { usePushRegistration } from "@/hooks/usePushRegistration";
+import {
+  routeNotificationData,
+  routeNotificationPath,
+} from "@/constants/LinkingConfiguration";
 
 export const TOKEN_KEY = "hakwa_token";
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -27,6 +32,10 @@ export default function RootLayout() {
 
   // null = loading, false = unauthenticated, true = authenticated
   const [authReady, setAuthReady] = useState<boolean | null>(null);
+
+  usePushRegistration((data) => {
+    routeNotificationData(router, data);
+  });
 
   useEffect(() => {
     async function restoreSession() {
@@ -82,6 +91,8 @@ export default function RootLayout() {
         if (res.ok) router.replace("/auth/sign-in");
       } else if (path?.includes("reset-password")) {
         router.push({ pathname: "/auth/reset-password", params: { token } });
+      } else {
+        routeNotificationPath(router, path);
       }
     } catch {
       // Ignore deep link errors

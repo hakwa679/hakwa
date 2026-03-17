@@ -110,3 +110,22 @@ bulk-pre-created, to avoid O(users) write storms.
 
 **Rationale**: Lazy creation is O(1) per interaction vs O(users) on Monday
 morning. Matches the constitution's scale constraint.
+
+---
+
+## Decision: Badge Applicability for Both Actor Types
+
+**Decision**: Keep badge `applicableTo` unchanged (`"passenger" | "operator"`)
+and seed one row per badge per actor type instead of introducing a new `"both"`
+enum value.
+
+**Rationale**: This avoids a schema enum/type migration touching existing
+gamification flows while still making all mapping badges available to both
+audiences. Badge-award queries remain simple (`WHERE applicableTo = actorType`).
+
+**Alternatives considered**:
+
+- Add `"both"` to the badge actor union: reduces seed rows but introduces
+  additional branching in all badge evaluation logic and migration overhead.
+- Duplicate business logic per actor without duplicated rows: increases runtime
+  complexity and makes badge filtering less explicit.

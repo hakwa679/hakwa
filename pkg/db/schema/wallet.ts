@@ -1,11 +1,16 @@
 import {
+  date,
+  integer,
   numeric,
+  pgEnum,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { merchant } from "./merchant.ts";
 
 export enum HolderType {
   INDIVIDUAL = "individual",
@@ -89,28 +94,41 @@ export type NewLedgerEntry = typeof ledgerEntry.$inferInsert;
 // Weekly payout tables
 // ---------------------------------------------------------------------------
 
-type PayoutBatchStatus = "scheduled" | "processing" | "completed" | "failed";
+export const payoutBatchStatusEnum = pgEnum("payout_batch_status", [
+  "scheduled",
+  "processing",
+  "completed",
+]);
 
 /**
  * One record per weekly payout cycle. A batch sweeps all merchant wallet
  * balances out to their registered bank accounts at the end of each week.
  */
-export const payoutBatch = pgTable("payout_batch", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  weekStart: timestamp("week_start").notNull(),
-  weekEnd: timestamp("week_end").notNull(),
-  status: text("status")
-    .notNull()
-    .$type<PayoutBatchStatus>()
-    .default("scheduled"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  processedAt: timestamp("processed_at"),
-});
+export const payoutBatch = pgTable(
+  "payout_batch",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    weekStart: date("week_start").notNull(),
+    status: payoutBatchStatusEnum("status").notNull().default("scheduled"),
+    merchantCount: integer("merchant_count").notNull().default(0),
+    totalAmount: numeric("total_amount", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0.00"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+  },
+  (table) => [uniqueIndex("payout_batch_week_start_uniq").on(table.weekStart)],
+);
 
 export type PayoutBatch = typeof payoutBatch.$inferSelect;
 export type NewPayoutBatch = typeof payoutBatch.$inferInsert;
 
-type PayoutStatus = "pending" | "processing" | "completed" | "failed";
+export const payoutStatusEnum = pgEnum("payout_status", [
+  "pending",
+  "processing",
+  "succeeded",
+  "failed",
+]);
 
 /**
  * One record per merchant disbursement within a payout batch.
@@ -121,9 +139,9 @@ export const payout = pgTable("payout", {
   batchId: uuid("batch_id")
     .notNull()
     .references(() => payoutBatch.id, { onDelete: "cascade" }),
-  walletId: uuid("wallet_id")
+  merchantId: uuid("merchant_id")
     .notNull()
-    .references(() => wallet.id, { onDelete: "cascade" }),
+    .references(() => merchant.id, { onDelete: "cascade" }),
   bankAccountId: uuid("bank_account_id")
     .notNull()
     .references(() => bankAccount.id, { onDelete: "cascade" }),
@@ -134,7 +152,9 @@ export const payout = pgTable("payout", {
     .default("1.00"),
   /** amount − serviceFee — the net value actually transferred to the bank. */
   netAmount: numeric("net_amount", { precision: 10, scale: 2 }).notNull(),
-  status: text("status").notNull().$type<PayoutStatus>().default("pending"),
+  status: payoutStatusEnum("status").notNull().default("pending"),
+  failureReason: text("failure_reason"),
+  completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   processedAt: timestamp("processed_at"),
 });

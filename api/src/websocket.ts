@@ -75,6 +75,7 @@ const handleConnection = (
     userConnections.set(userId, new Set());
     // Subscribe to this user's notification channel on first connection
     const notifChannel = `user:${userId}:notifications`;
+    const gamificationChannel = `user:${userId}:gamification`;
     redisSubscriber.subscribe(notifChannel, (err) => {
       if (err) {
         console.error("[ws] redis subscribe error", {
@@ -87,6 +88,21 @@ const handleConnection = (
           event: "ws.subscribed",
           userId,
           channel: notifChannel,
+        });
+      }
+    });
+    redisSubscriber.subscribe(gamificationChannel, (err) => {
+      if (err) {
+        console.error("[ws] redis subscribe error", {
+          event: "ws.subscribed",
+          userId,
+          err,
+        });
+      } else {
+        console.info("[ws] subscribed to gamification channel", {
+          event: "ws.subscribed",
+          userId,
+          channel: gamificationChannel,
         });
       }
     });
@@ -198,15 +214,27 @@ const handleConnection = (
       if (conns.size === 0) {
         userConnections.delete(userId);
         // Unsubscribe once the last connection for this user closes
-        const channel = `user:${userId}:notifications`;
-        redisSubscriber.unsubscribe(channel, (err) => {
+        const notificationChannel = `user:${userId}:notifications`;
+        const gamificationChannel = `user:${userId}:gamification`;
+        redisSubscriber.unsubscribe(notificationChannel, (err) => {
           if (err) {
             console.error("[ws] redis unsubscribe error", { userId, err });
           } else {
             console.info("[ws] unsubscribed from notification channel", {
               event: "ws.unsubscribed",
               userId,
-              channel,
+              channel: notificationChannel,
+            });
+          }
+        });
+        redisSubscriber.unsubscribe(gamificationChannel, (err) => {
+          if (err) {
+            console.error("[ws] redis unsubscribe error", { userId, err });
+          } else {
+            console.info("[ws] unsubscribed from gamification channel", {
+              event: "ws.unsubscribed",
+              userId,
+              channel: gamificationChannel,
             });
           }
         });
@@ -272,11 +300,12 @@ redisSubscriber.on("message", (channel: string, message: string) => {
     return;
   }
 
-  // 3. user:{userId}:notifications fan-out
+  // 4. user:{userId}:notifications or user:{userId}:gamification fan-out
   const match = /^user:(.+):notifications$/.exec(channel);
-  if (!match?.[1]) return;
+  const gamificationMatch = /^user:(.+):gamification$/.exec(channel);
+  const userId = match?.[1] ?? gamificationMatch?.[1];
+  if (!userId) return;
 
-  const userId = match[1];
   const conns = userConnections.get(userId);
   if (!conns || conns.size === 0) return;
 

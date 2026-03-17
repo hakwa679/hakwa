@@ -63,6 +63,47 @@ export interface ApiError {
   message: string;
 }
 
+export interface MerchantPayoutListItem {
+  id: string;
+  weekStart: string;
+  weekEnd: string;
+  weekPeriod: string;
+  amount: string;
+  serviceFee: string;
+  netAmount: string;
+  status: "pending" | "processing" | "succeeded" | "failed";
+  processedAt: string | null;
+  completedAt: string | null;
+  bankAccount: {
+    bankName: string;
+    accountNumberLast4: string;
+  };
+}
+
+export interface MerchantPayoutHistoryResponse {
+  items: MerchantPayoutListItem[];
+  nextCursor: string | null;
+  nextPayoutDate: string;
+}
+
+export interface MerchantPayoutDetail {
+  id: string;
+  weekStart: string;
+  weekEnd: string;
+  amount: string;
+  serviceFee: string;
+  netAmount: string;
+  status: "pending" | "processing" | "succeeded" | "failed";
+  failureReason: string | null;
+  processedAt: string | null;
+  completedAt: string | null;
+  bankAccount: {
+    bankName: string;
+    accountNumberLast4: string;
+  };
+  note: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // API helpers
 // ---------------------------------------------------------------------------
@@ -167,4 +208,44 @@ export async function addVehicle(data: {
   if (!res.ok)
     throw new Error((json["message"] as string) ?? "Failed to add vehicle");
   return json as unknown as VehicleData;
+}
+
+export async function fetchPayoutHistory(
+  cursor?: string,
+): Promise<MerchantPayoutHistoryResponse> {
+  const headers = await getAuthHeaders();
+  const params = new URLSearchParams({ limit: "20" });
+  if (cursor) {
+    params.set("cursor", cursor);
+  }
+
+  const res = await fetch(
+    `${API_URL}/api/merchant/payouts?${params.toString()}`,
+    {
+      headers,
+    },
+  );
+  const json = (await res.json()) as MerchantPayoutHistoryResponse | ApiError;
+  if (!res.ok) {
+    throw new Error((json as ApiError).message ?? "Failed to load payouts");
+  }
+
+  return json as MerchantPayoutHistoryResponse;
+}
+
+export async function fetchPayoutDetail(
+  payoutId: string,
+): Promise<MerchantPayoutDetail> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/merchant/payouts/${payoutId}`, {
+    headers,
+  });
+  const json = (await res.json()) as MerchantPayoutDetail | ApiError;
+  if (!res.ok) {
+    throw new Error(
+      (json as ApiError).message ?? "Failed to load payout detail",
+    );
+  }
+
+  return json as MerchantPayoutDetail;
 }

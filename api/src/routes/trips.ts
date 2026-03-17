@@ -4,13 +4,17 @@ import {
   type Response,
   type NextFunction,
 } from "express";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import db from "@hakwa/db";
 import { trip, user as userTable } from "@hakwa/db/schema";
 import { getSessionFromRequest } from "@hakwa/auth";
 import { redis } from "@hakwa/redis";
 import { BASE_FARE_FJD, RATE_PER_KM_FJD } from "@hakwa/core";
-import { ForbiddenError, NotFoundError, ConflictError } from "../services/merchantService.ts";
+import {
+  ForbiddenError,
+  NotFoundError,
+  ConflictError,
+} from "../services/merchantService.ts";
 
 export const tripsRouter = Router();
 
@@ -70,12 +74,19 @@ tripsRouter.get(
 
       // Ownership check — T025 equivalence
       if (tripRow.passengerId !== userId) {
-        next(new ForbiddenError("FORBIDDEN", "You are not the passenger of this trip."));
+        next(
+          new ForbiddenError(
+            "FORBIDDEN",
+            "You are not the passenger of this trip.",
+          ),
+        );
         return;
       }
 
       if (tripRow.status !== "completed") {
-        next(new ConflictError("TRIP_NOT_COMPLETED", "Trip is not yet completed."));
+        next(
+          new ConflictError("TRIP_NOT_COMPLETED", "Trip is not yet completed."),
+        );
         return;
       }
 
@@ -144,12 +155,19 @@ tripsRouter.post(
       }
 
       if (tripRow.passengerId !== userId) {
-        next(new ForbiddenError("FORBIDDEN", "You are not the passenger of this trip."));
+        next(
+          new ForbiddenError(
+            "FORBIDDEN",
+            "You are not the passenger of this trip.",
+          ),
+        );
         return;
       }
 
       if (tripRow.status !== "completed") {
-        next(new ConflictError("TRIP_NOT_COMPLETED", "Trip is not yet completed."));
+        next(
+          new ConflictError("TRIP_NOT_COMPLETED", "Trip is not yet completed."),
+        );
         return;
       }
 

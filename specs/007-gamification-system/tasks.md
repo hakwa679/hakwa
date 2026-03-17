@@ -24,17 +24,17 @@ data-model.md **Tech Stack**: TypeScript 5.x, Drizzle ORM, PostgreSQL, Redis
 **Purpose**: Confirm schema enums, seed badge/level data, and establish
 constants before worker code
 
-- [ ] T001 Confirm `pointsSourceActionEnum` values (`trip_completed`,
+- [x] T001 Confirm `pointsSourceActionEnum` values (`trip_completed`,
       `referral_signup`, `referral_trip`, `badge_earned`, `streak_milestone_7`,
       `streak_milestone_30`, `map_contribution`, `review_submitted`) in
       `pkg/db/schema/gamification.ts`
-- [ ] T002 Confirm `UNIQUE (userId, badgeId)` constraint on `userBadge` and
+- [x] T002 Confirm `UNIQUE (userId, badgeId)` constraint on `userBadge` and
       `UNIQUE (refereeId)` on `referral` in `pkg/db/schema/gamification.ts`
-- [ ] T003 [P] Create `pkg/core/src/gamificationConstants.ts` with
+- [x] T003 [P] Create `pkg/core/src/gamificationConstants.ts` with
       `POINTS_PER_TRIP`, `REFERRAL_SIGNUP_POINTS` (50), `REFERRAL_TRIP_POINTS`
       (100), `MAX_REFERRAL_REWARDS` (20), `STREAK_BONUS_7` (25),
       `STREAK_BONUS_30` (100), `STREAK_MILESTONES`
-- [ ] T004 [P] Seed initial `level` rows (Level 1 "Novice" 0pts, Level 2
+- [x] T004 [P] Seed initial `level` rows (Level 1 "Novice" 0pts, Level 2
       "Explorer" 100pts, Level 3 "Navigator" 300pts, etc.) and seed initial
       `badge` rows (`first_trip`, `ten_trips`, `top_referrer`) in database seed
       script
@@ -48,25 +48,25 @@ exist before any gamification event can be processed
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Implement `XADD` publish in `api/src/services/tripService.ts` — after
+- [x] T005 Implement `XADD` publish in `api/src/services/tripService.ts` — after
       primary trip completion transaction commits, publish
       `{ type: 'trip_completed', userId, tripId, timestamp }` to Redis Stream
       `gamification:events`
-- [ ] T006 Implement `gamificationConsumer.ts` in
+- [x] T006 Implement `gamificationConsumer.ts` in
       `api/src/jobs/gamificationConsumer.ts` — `XREAD` loop on
       `gamification:events` stream; dispatch each event type to
       `gamificationProcessor` worker pool
-- [ ] T007 Implement `gamificationProcessor.ts` in
+- [x] T007 Implement `gamificationProcessor.ts` in
       `pkg/workers/src/workers/gamificationProcessor.ts` — route
       `trip_completed`, `user_registered`, `first_trip_completed`,
       `referral_used` event types to respective handlers
-- [ ] T008 [P] Implement real-time notify helper in `gamificationProcessor.ts` —
+- [x] T008 [P] Implement real-time notify helper in `gamificationProcessor.ts` —
       publish to `user:{userId}:gamification` Redis pub/sub channel after each
       award
-- [ ] T009 [P] Subscribe to `user:{userId}:gamification` in
+- [x] T009 [P] Subscribe to `user:{userId}:gamification` in
       `api/src/websocket.ts` — push gamification events to passenger/driver
       WebSocket clients
-- [ ] T010 Register gamification routes and start gamification consumer in
+- [x] T010 Register gamification routes and start gamification consumer in
       `api/src/index.ts`
 
 **Checkpoint**: Foundation complete — event pipeline, worker dispatch, and
@@ -84,12 +84,12 @@ has a `trip_completed` entry with 10 points; `pointsAccount.totalPoints`
 incremented; `user:{userId}:gamification` channel receives `points_awarded`
 event; in-app notification delivered.
 
-- [ ] T011 [US1] Implement `handleTripCompleted` in `gamificationProcessor.ts` —
+- [x] T011 [US1] Implement `handleTripCompleted` in `gamificationProcessor.ts` —
       in Drizzle transaction: insert `pointsLedger` row (`trip_completed`,
       `POINTS_PER_TRIP`),
       `UPDATE pointsAccount SET totalPoints += points WHERE userId = ?`; then
       publish gamification event and `@hakwa/notifications` push
-- [ ] T012 [P] [US1] Implement `GET /api/me/gamification` in
+- [x] T012 [P] [US1] Implement `GET /api/me/gamification` in
       `api/src/routes/meGamification.ts` — return
       `{ totalPoints, currentLevel, nextLevel, pointsToNext, referralCode, badges, currentStreak }`
 - [ ] T013 [P] [US1] Build `GamificationProfileCard` in

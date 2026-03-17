@@ -5,9 +5,11 @@ import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const unreadCount = useUnreadNotifications();
 
   return (
     <Tabs
@@ -41,6 +43,25 @@ export default function TabLayout() {
               color={color}
             />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: "Notifications",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol
+              size={28}
+              name="bell.fill"
+              color={color}
+            />
+          ),
+          tabBarBadge:
+            unreadCount > 0
+              ? unreadCount > 99
+                ? "99+"
+                : unreadCount
+              : undefined,
         }}
       />
     </Tabs>

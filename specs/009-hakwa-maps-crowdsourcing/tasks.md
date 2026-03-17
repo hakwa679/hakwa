@@ -1,438 +1,572 @@
----
-description: "Task list for Hakwa Maps — Crowdsourced Data Collection"
----
+# Tasks: Hakwa Maps - Crowdsourced Data Collection
 
-# Tasks: Hakwa Maps — Crowdsourced Data Collection
+**Input**: Design documents from `specs/009-hakwa-maps-crowdsourcing/`  
+**Prerequisites**: `plan.md` (required), `spec.md` (required), `research.md`,
+`data-model.md`, `contracts/rest-api.md`, `quickstart.md`
 
-**Feature Branch**: `009-hakwa-maps-crowdsourcing` **Input**: plan.md, spec.md,
-data-model.md **Tech Stack**: TypeScript 5.x, Drizzle ORM, PostgreSQL, Redis
-(Sorted Set, pub/sub, Hash), `@hakwa/workers`, `@hakwa/notifications`,
-`@hakwa/core`, `@hakwa/ui-native`, Expo / React Native
+**Tests**: Included. The feature specification requires scenario testing and
+measurable outcomes.
 
----
+**Organization**: Tasks are grouped by user story for independent implementation
+and validation.
 
 ## Format: `[ID] [P?] [Story] Description`
 
-- **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Which user story this task belongs to (US1–US11)
-- All paths relative to repo root
+- **[P]**: Task can run in parallel (different files, no dependency on
+  incomplete tasks)
+- **[Story]**: User story label (`[US1]` ... `[US11]`)
+- Every task includes a concrete file path
+
+## Phase 1: Setup (Shared Infrastructure)
+
+**Purpose**: Initialize schema and shared map modules required by all stories.
+
+- [ ] T001 Create map schema module and base exports in `pkg/db/schema/map.ts`
+- [ ] T002 [P] Export map schema from root schema barrel in
+      `pkg/db/schema/index.ts`
+- [ ] T003 [P] Add map action constants and Fiji bounds constants in
+      `pkg/core/src/gamificationConstants.ts`
+- [ ] T004 [P] Add geometry validation and precision helpers in
+      `pkg/core/src/geometry/validate.ts`
+- [ ] T005 [P] Add Ramer-Douglas-Peucker simplification utility in
+      `pkg/core/src/geometry/rdp.ts`
+- [ ] T006 [P] Add map request/response contracts for API and clients in
+      `pkg/types/src/map.ts`
+- [ ] T007 Register map routes placeholder and router mount in
+      `api/src/index.ts`
+- [ ] T008 [P] Add map mission template definitions in
+      `api/src/jobs/missionTemplates.ts`
+- [ ] T009 Add map zone seed script shell in `api/src/jobs/seedMapZones.ts`
 
 ---
 
-## Phase 1: Setup (Schema)
+## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Define all map tables and extend gamification enums before any
-route or worker code can be written
+**Purpose**: Core persistence, safety, and async infrastructure that blocks all
+stories.
 
-- [ ] T001 Define `mapFeature` table (id, contributorId FK→user, type, name,
-      category, description, geometryJson, photoUrl, status enum
-      `pending|active|rejected|stale|pending_review|under_review`, confirmCount,
-      disputeCount, osmRef, osmLicence default `ODbL`, gpxAccuracyM,
-      gpsVelocityFlag, expiresAt, createdAt, updatedAt) with indexes on
-      `status`, `contributorId`, `createdAt` in `pkg/db/schema/map.ts`
-- [ ] T002 Define `mapVerification` table (id, featureId FK→mapFeature, userId
-      FK→user, vote `confirm|dispute`, disputeCategory nullable, note nullable,
-      createdAt) with `UNIQUE(featureId, userId)` in `pkg/db/schema/map.ts`
-- [ ] T003 [P] Define `mapContributorStats` table (id, userId UNIQUE FK→user,
-      totalContributions, acceptedContributions, totalVerifications, mapStreak,
-      mapStreakCheckpoint, rideImpactCount, updatedAt) in `pkg/db/schema/map.ts`
-- [ ] T004 [P] Define `mapZone` table (id, slug UNIQUE, displayName,
-      geometryJson, targetFeatureCount, currentFeatureCount default 0,
-      createdAt) and `mapFeatureReport` table (id, featureId FK, reporterId FK,
-      reason, note, status default `open`, createdAt) with
-      `UNIQUE(featureId, reporterId)` in `pkg/db/schema/map.ts`
-- [ ] T005 [P] Define `mapContributorTrust` table (id, userId UNIQUE FK→user,
-      isMapBanned default false, banReason, banExpiresAt, contentFlagCount,
-      updatedAt) and `mapModerationLog` table (id, featureId, moderatorId,
-      action, note, createdAt) in `pkg/db/schema/map.ts`
-- [ ] T006 [P] Define `mapMission` table (id, weekStart, deadline, actionType,
-      targetCount, zoneId nullable FK→mapZone, pointsBonus) and
-      `mapMissionProgress` table (id, missionId FK, userId FK, progressCount,
-      status `in_progress|completed|expired`, updatedAt) with
-      `UNIQUE(missionId, userId)` in `pkg/db/schema/map.ts`
-- [ ] T007 [P] Define `mapRoadTrace` table (id, tripId nullable FK→trip,
-      driverId FK→user, traceGeoJson, novelKm, pointsAwarded, processedAt) in
-      `pkg/db/schema/map.ts`
-- [ ] T008 Extend `pointsSourceActionEnum` in `pkg/db/schema/gamification.ts`
-      with map action values: `map_contribution`, `map_verification`,
-      `map_contribution_accepted`, `map_road_trace`, `map_mission_completed`,
-      `map_pioneer_bonus`
-- [ ] T009 Add map-action constants to `pkg/core/src/gamificationConstants.ts`:
-      `MAP_POINTS_CONTRIBUTION` (25), `MAP_POINTS_VERIFICATION` (5),
-      `MAP_POINTS_ACCEPTED_BONUS` (50), `MAP_POINTS_PIONEER_BONUS` (75),
-      `MAP_POINTS_MISSION_BONUS` (100), `MAP_DAILY_LIMIT_FEATURES` (20),
-      `MAP_ACTIVATION_THRESHOLD` (3), `MAP_REJECTION_THRESHOLD` (3),
-      `MAP_GPS_MAX_VELOCITY_KM_H` (250), `MAP_ROAD_TRACE_DAILY_CAP_PTS` (50)
-- [ ] T010 Export all map entities from `pkg/db/schema/index.ts` and run
-      `db-push` to apply schema; seed `mapZone` rows for initial Fiji zones
-      (Suva CBD, Nadi Town, Lautoka, Labasa, Sigatoka Valley) and initial map
-      badges in `badge` table
+**CRITICAL**: Complete this phase before any user story implementation.
+
+- [ ] T010 Define `map_feature`, `map_verification`, and `map_contributor_stats`
+      tables in `pkg/db/schema/map.ts`
+- [ ] T011 [P] Define `map_zone`, `map_mission`, and `map_mission_progress`
+      tables in `pkg/db/schema/map.ts`
+- [ ] T012 [P] Define `map_road_trace`, `map_feature_report`,
+      `map_contributor_trust`, `map_moderation_log`, and `map_abuse_flag` tables
+      in `pkg/db/schema/map.ts`
+- [ ] T013 Extend map points source actions in `pkg/db/schema/gamification.ts`
+- [ ] T014 Implement map safety and trust helpers (ban check, trust tier,
+      content screening) in `api/src/services/mapSafetyService.ts`
+- [ ] T015 [P] Implement map repository data access layer with transactional
+      helpers in `api/src/services/mapRepository.ts`
+- [ ] T016 [P] Implement Redis cache/leaderboard/zone key helpers in
+      `api/src/services/mapRedisService.ts`
+- [ ] T017 Add map-specific error codes and mappers in
+      `pkg/errors/src/mapErrors.ts`
+- [ ] T018 Apply schema and verify migration state with db push docs update in
+      `pkg/db/README.md`
+
+**Checkpoint**: Foundation complete; user story phases can proceed in priority
+order or in parallel by team.
 
 ---
 
-## Phase 2: Foundational (Safety + Content Screener)
+## Phase 3: User Story 1 - Submit a Map Contribution (Priority: P1) MVP
 
-**Purpose**: Safety infrastructure must exist before any contribution submission
-endpoint is implemented
+**Goal**: Authenticated rider/driver can submit map features with validation,
+pending status, and contribution points.
 
-**⚠️ CRITICAL**: Content screener, GPS velocity check, and ban check must all
-run synchronously inside `POST /map/features` before any DB transaction opens
+**Independent Test**: Valid contribution creates `map_feature` (`pending`) and
+ledger updates, then appears in pending list for contributor.
 
-- [ ] T011 Create `api/src/config/map-blocklist.json` with initial blocked
-      keywords array; implement `pkg/core/src/mapSafety.ts` with
-      `screenContent({ name, description }): "pass" | "flag" | "auto_reject"` —
-      loads blocklist on import, matches against compiled `Set<string>` and
-      `RegExp[]`
-- [ ] T012 Implement trust-tier and ban check helper in
-      `pkg/core/src/mapSafety.ts`: `getContributorTrust(userId)` — query
-      `mapContributorTrust` (lazy create); derive tier from
-      `acceptedContributions`: 0–9 = `standard`, 10–49 = `trusted`, 50+ =
-      `senior`; return `{ isBanned, tier }`
-- [ ] T013 [P] Implement GPS velocity check utility in
-      `pkg/core/src/mapSafety.ts`: `checkGpsVelocity(userId, lat, lng, db)` —
-      fetch most recent `mapFeature.createdAt + geometryJson` for user;
-      haversine distance ÷ elapsed minutes; return `boolean` flagged if >
-      `MAP_GPS_MAX_VELOCITY_KM_H`
-- [ ] T014 [P] Implement haversine distance utility in `pkg/core/src/geo.ts` for
-      same-service spatial queries (used by velocity check and road-trace
-      worker)
+### Tests for User Story 1
 
----
+- [ ] T019 [P] [US1] Add contract tests for `POST /api/v1/map/features` in
+      `api/tests/contract/map.submit.contract.test.ts`
+- [ ] T020 [P] [US1] Add integration tests for GPS accuracy, daily cap, and
+      photo bonus in `api/tests/integration/map.submit.integration.test.ts`
 
-## Phase 3: User Story 1 + User Story 11 — Submit Contribution & Safety Enforcement (Priority: P1) 🎯 MVP
+### Implementation for User Story 1
 
-**Goal**: Logged-in user submits a map feature; content screener runs
-synchronously; GPS accuracy and daily rate limit are enforced; `mapFeature` row
-inserted with correct initial status; points awarded async via gamification
-event.
+- [ ] T021 [US1] Implement `POST /api/v1/map/features` handler in
+      `api/src/routes/map.ts`
+- [ ] T022 [US1] Implement submission service transaction (feature insert +
+      stats + points events) in `api/src/services/mapContributionService.ts`
+- [ ] T023 [P] [US1] Implement out-of-bounds and coordinate sanitization checks
+      in `api/src/services/mapValidationService.ts`
+- [ ] T024 [P] [US1] Implement duplicate proximity warning lookup logic in
+      `api/src/services/mapQueryService.ts`
+- [ ] T025 [US1] Implement `GET /api/v1/map/features/pending`
+      contributor-visible query in `api/src/routes/map.ts`
+- [ ] T026 [US1] Add map contribution client calls in shared API client in
+      `pkg/api-client/src/mapClient.ts`
 
-**Independent Test**: Valid submission → `mapFeature` row with
-`status = pending`; `map_contribution` `pointsLedger` entry via gamification
-stream; `mapContributorStats.totalContributions` incremented. Blocked-keyword
-submission → `status = pending_review`, no ledger entry (screener test is
-independent).
-
-- [ ] T015 [US1] [US11] Implement `POST /api/map/features` in
-      `api/src/routes/map.ts`: (1) require session, (2) `getContributorTrust` →
-      reject if `isBanned`, (3) `screenContent` → if `auto_reject` return 400;
-      if `flag` insert with `status = pending_review` and no points, (4) enforce
-      daily rate limit (count user's `mapFeature.createdAt` >= today) → 429 if ≥
-      `MAP_DAILY_LIMIT_FEATURES`, (5) enforce GPS accuracy ≤ 50 m from
-      `gpxAccuracyM`, (6) `checkGpsVelocity` → set `gpsVelocityFlag = true` if
-      fired, (7) insert `mapFeature` row and `mapContributorStats` upsert in
-      transaction; (8) publish `map_contribution` event to `gamification:events`
-      stream for points
-- [ ] T016 [P] [US11] Implement `POST /api/map/features/:id/report` in
-      `api/src/routes/map.ts` — session required;
-      `UNIQUE(featureId, reporterId)` constraint prevents duplicates; reporter ≠
-      contributor enforced; if report count reaches `MAP_REPORT_THRESHOLD` (3):
-      atomically transition `status` to `under_review`, notify original
-      contributor, publish `map:features:under_review` Redis pub/sub for
-      moderator dashboard
-- [ ] T017 [P] [US1] Implement `GET /api/map/features` (pending layer) in
-      `api/src/routes/map.ts` — return `status = pending` features for the
-      requesting user including own submissions; optionally filter by `?bbox`
-
-**Checkpoint**: User Story 1 + 11 (submission + safety) complete — features are
-submitted with screener enforcement and async gamification points
+**Checkpoint**: US1 independently functional and testable.
 
 ---
 
-## Phase 4: User Story 2 — Verify a Pending Contribution (Priority: P1)
+## Phase 4: User Story 2 - Verify a Pending Contribution (Priority: P1)
 
-**Goal**: Any user (except the contributor) can confirm or dispute a pending
-feature; `mapVerification` row created; vote counters incremented; points
-awarded; duplicate and self-vote prevented.
+**Goal**: Users can confirm/dispute other users' pending features with one vote
+per feature and points award.
 
-**Independent Test**: `POST /api/map/features/:id/verify` with `vote = confirm`
-→ `mapVerification` row created; feature `confirmCount` incremented;
-`map_verification` gamification event published; second vote by same user → 409.
+**Independent Test**: Non-owner can cast confirm/dispute once; duplicate vote
+and self-verification are blocked.
 
-- [ ] T018 [US2] Implement `POST /api/map/features/:id/verify` in
-      `api/src/routes/map.ts`: (1) session required, (2) verify
-      `mapFeature.status = pending`, (3) reject if
-      `feature.contributorId === userId` (self-vote → 403), (4)
-      `INSERT INTO mapVerification ON CONFLICT (featureId, userId) DO NOTHING` —
-      if rowCount = 0 return 409 `MAP_ALREADY_VOTED`, (5)
-      `UPDATE mapFeature SET confirmCount (or disputeCount) += 1`; (6) upsert
-      `mapContributorStats.totalVerifications += 1` in same transaction; (7)
-      publish `map_verification` gamification event
-- [ ] T019 [P] [US2] Serve verification card data at `GET /api/map/features/:id`
-      — return feature with submitter first name, photo, type, category, status,
-      confirmCount, disputeCount; include `isOwnSubmission` boolean
+### Tests for User Story 2
 
-**Checkpoint**: User Story 2 complete — community voting is functional with
-idempotency and self-vote guard
+- [ ] T027 [P] [US2] Add contract tests for
+      `POST /api/v1/map/features/:id/verify` in
+      `api/tests/contract/map.verify.contract.test.ts`
+- [ ] T028 [P] [US2] Add integration tests for double-vote and self-vote
+      rejection in `api/tests/integration/map.verify.integration.test.ts`
 
----
+### Implementation for User Story 2
 
-## Phase 5: User Story 3 — Feature Activation, Rejection & Status Transitions (Priority: P1)
+- [ ] T029 [US2] Implement verify endpoint and request validation in
+      `api/src/routes/map.ts`
+- [ ] T030 [US2] Implement vote insert and idempotency enforcement in
+      `api/src/services/mapVerificationService.ts`
+- [ ] T031 [P] [US2] Implement verification card feature detail query in
+      `api/src/services/mapQueryService.ts`
+- [ ] T032 [P] [US2] Add verification calls in API client for mobile/web in
+      `pkg/api-client/src/mapClient.ts`
+- [ ] T033 [US2] Add verification interaction hook for UI clients in
+      `pkg/api-client/src/hooks/useMapVerification.ts`
 
-**Goal**: Reaching `ACTIVATION_THRESHOLD` confirms transitions to `active`;
-reaching `REJECTION_THRESHOLD` disputes transitions to `rejected`; zone counter
-incremented on activation; pioneer bonus check; nightly stale job.
-
-**Independent Test**: Drive `confirmCount` to 3 → `status = active`; drive
-`disputeCount` to 3 → `status = rejected`; zone `currentFeatureCount`
-incremented without touching missions, leaderboard, or badges.
-
-- [ ] T020 [US3] Implement `checkActivationThreshold` service in
-      `api/src/services/mapFeatureService.ts` — called after vote insert; if
-      `confirmCount >= MAP_ACTIVATION_THRESHOLD`: atomically
-      `UPDATE mapFeature SET status = 'active', expiresAt = NULL`; increment
-      `mapZone.currentFeatureCount` via zone point-in-polygon check in
-      `api/src/services/mapZoneService.ts`; publish `map:features:activated`
-      Redis pub/sub; award `map_contribution_accepted` bonus (50 pts) to
-      original contributor via gamification stream
-- [ ] T021 [US3] Implement rejection in same service — if
-      `disputeCount >= MAP_REJECTION_THRESHOLD`:
-      `UPDATE mapFeature SET status = 'rejected'`; feature removed from all map
-      layers
-- [ ] T022 [P] [US3] Implement `mapZoneService.ts` in
-      `api/src/services/mapZoneService.ts` — `getZoneForPoint(lat, lng)`: load
-      zone polygons (cached in Redis `map:zones:all` JSON with TTL 1 h);
-      point-in-polygon check; return matching `mapZone` or null
-- [ ] T023 [P] [US3] Implement nightly stale cleanup job in
-      `api/src/jobs/mapStaleCleaner.ts` —
-      `UPDATE mapFeature SET status = 'stale' WHERE status = 'pending' AND expiresAt < now()`
-      and `confirmCount + disputeCount < 2`; scheduled at 02:00 UTC daily
-- [ ] T024 [P] [US3] Subscribe to `map:features:activated` pub/sub in
-      `api/src/websocket.ts` — broadcast real-time map layer update to all
-      connected clients
-
-**Checkpoint**: User Story 3 complete — feature lifecycle state machine is
-implemented including activation, rejection, stale, and zone side-effects
+**Checkpoint**: US2 independently functional and testable.
 
 ---
 
-## Phase 6: User Story 4 — Map Badges & Milestones (Priority: P2)
+## Phase 5: User Story 3 - Feature Goes Active / Rejected (Priority: P1)
 
-**Goal**: Map-specific badges awarded idempotently on contribution/verification
-milestones; `badge_earned` gamification event triggers notification.
+**Goal**: Threshold-based transition from pending to active/rejected with voting
+closure and stale cleanup.
 
-**Independent Test**: Drive `acceptedContributions` to 1 →
-`map_first_contribution` badge awarded; drive to 10 → `map_10_accepted`; drive
-`totalVerifications` to 25 → `map_25_verifications`; all via badge worker
-independent of other systems.
+**Independent Test**: Incrementing vote counters drives deterministic state
+transitions without relying on badges/leaderboard.
 
-- [ ] T025 [US4] Add map badge seeds to `badge` table: `map_first_contribution`,
-      `map_10_accepted`, `map_local_expert` (50 accepted),
-      `map_25_verifications`, `map_community_guardian` (100 verifications),
-      `map_cartographer` (200+ actions + both `map_local_expert` and
-      `map_community_guardian`), `map_pioneer`, `map_explorer` (3 pioneered
-      zones), `map_zone_complete`
-- [ ] T026 [US4] Extend `evaluateBadges` in
-      `pkg/workers/src/workers/gamificationProcessor.ts` to evaluate map badges
-      from `mapContributorStats` — check after every `map_contribution`,
-      `map_verification`, `map_contribution_accepted`, and `map_pioneer_bonus`
-      gamification event; `INSERT INTO userBadge ON CONFLICT DO NOTHING`
+### Tests for User Story 3
 
-**Checkpoint**: User Story 4 complete — map milestone badges are awarded
-idempotently
+- [ ] T034 [P] [US3] Add integration tests for activation/rejection thresholds
+      in `api/tests/integration/map.lifecycle.integration.test.ts`
+- [ ] T035 [P] [US3] Add concurrency tests for atomic threshold transitions in
+      `api/tests/integration/map.lifecycle.concurrency.test.ts`
 
----
+### Implementation for User Story 3
 
-## Phase 7: User Story 5 — Map Leaderboard (Priority: P2)
+- [ ] T036 [US3] Implement threshold transition logic with row locking in
+      `api/src/services/mapLifecycleService.ts`
+- [ ] T037 [P] [US3] Implement `GET /api/v1/map/features/active` GeoJSON
+      endpoint in `api/src/routes/map.ts`
+- [ ] T038 [P] [US3] Implement active layer cache invalidation and refresh in
+      `api/src/services/mapRedisService.ts`
+- [ ] T039 [US3] Implement nightly stale transition job in
+      `api/src/jobs/mapStaleCleanupJob.ts`
+- [ ] T040 [US3] Implement re-open flow from active to pending with fresh vote
+      slate in `api/src/services/mapLifecycleService.ts`
 
-**Goal**: Monthly Redis Sorted Set tracks map points; top 50 returned with
-enrichment; user's own rank included even outside top 50; monthly reset with TTL
-archive.
-
-**Independent Test**:
-`ZADD map:leaderboard:monthly:{YYYY-MM} INCR {pts} {userId}` after ledger write;
-`GET /api/gamification/map-leaderboard` returns top 50 with rank, name,
-totalMapPoints, contributionCount, verificationCount.
-
-- [ ] T027 [US5] After each `map_contribution`, `map_verification`,
-      `map_contribution_accepted`, or `map_road_trace` gamification event
-      processed, call
-      `ZADD map:leaderboard:monthly:{YYYY-MM} INCR {points} {userId}` in
-      `gamificationProcessor.ts`; set `EXPIREAT` to first day of month +3 months
-- [ ] T028 [P] [US5] Implement `GET /api/gamification/map-leaderboard` in
-      `api/src/routes/leaderboard.ts` —
-      `ZREVRANGE map:leaderboard:monthly:{YYYY-MM} 0 49 WITHSCORES`; enrich with
-      user names and `mapContributorStats` from DB; also return caller's
-      `ZREVRANK` if outside top 50
-
-**Checkpoint**: User Story 5 complete — monthly map leaderboard operational
+**Checkpoint**: US3 independently functional and testable.
 
 ---
 
-## Phase 8: User Story 7 — Passive Road Tracing (Priority: P2)
+## Phase 6: User Story 11 - Safety, Moderation & Trust (Priority: P1)
 
-**Goal**: Opted-in drivers submit GPS trace after trip completion; road-trace
-worker computes novel km against active feature layer; points awarded up to
-daily cap in `mapRoadTrace` table.
+**Goal**: Harmful content handling, report escalation, moderator queue/actions,
+and trust-tier enforcement.
 
-**Independent Test**: A `mapRoadTrace` row is inserted and `map_road_trace`
-pointsLedger entry created for a 4.2 km novel-road trace, with
-`pointsAwarded = 4` (floored novel km); driver with 51 pts from today gets
-`pointsAwarded = 0` but trace still stored.
+**Independent Test**: Blocklist-triggered submission becomes `pending_review`
+with no points; moderation actions transition status atomically with audit log.
 
-- [ ] T029 [US7] Add `passiveTracingEnabled` boolean column to user profile
-      schema in `pkg/db/schema/auth-schema.ts`; expose
-      `PATCH /api/me/preferences` toggle in `api/src/routes/auth.ts`
-- [ ] T030 [US7] After `tripService.ts` trip completion, if
-      `driver.passiveTracingEnabled = true`, publish
-      `{ type: 'road_trace', driverId, tripId, traceGeoJson }` to
-      `gamification:events` stream (raw trace must not be logged externally)
-- [ ] T031 [US7] Implement `roadTraceWorker.ts` in
-      `pkg/workers/src/workers/roadTraceWorker.ts` — Ramer–Douglas–Peucker line
-      simplification; check each 50 m segment against active `mapFeature` bbox
-      (within 20 m = non-novel); compute novel km; floor to integer; check daily
-      cap (`MAP_ROAD_TRACE_DAILY_CAP_PTS`); insert `mapRoadTrace` row; insert
-      `map_road_trace` `pointsLedger` entry if cap not hit; dispatch
-      gamificationProcessor for points + notifications
+### Tests for User Story 11
 
-**Checkpoint**: User Story 7 complete — opt-in passive road tracing awards
-points for novel road km
+- [ ] T041 [P] [US11] Add contract tests for report and moderation endpoints in
+      `api/tests/contract/map.moderation.contract.test.ts`
+- [ ] T042 [P] [US11] Add integration tests for pending_review withholding and
+      admin approval payout in
+      `api/tests/integration/map.moderation.integration.test.ts`
 
----
+### Implementation for User Story 11
 
-## Phase 9: User Story 8 — Weekly Map Missions (Priority: P2)
+- [ ] T043 [US11] Implement `POST /api/v1/map/features/:id/report` endpoint in
+      `api/src/routes/map.ts`
+- [ ] T044 [US11] Implement moderator routes (`GET queue`, `POST moderate`) in
+      `api/src/routes/adminMap.ts`
+- [ ] T045 [US11] Implement role guard middleware (`admin`/`map_moderator`) in
+      `api/src/middleware/requireMapModerator.ts`
+- [ ] T046 [P] [US11] Implement moderation state machine and atomic
+      status+ledger updates in `api/src/services/mapModerationService.ts`
+- [ ] T047 [P] [US11] Implement dispute-category instant escalation for
+      trusted/senior users in `api/src/services/mapVerificationService.ts`
+- [ ] T048 [US11] Implement nightly abuse ring detector upsert job in
+      `api/src/jobs/mapAbuseCheckJob.ts`
 
-**Goal**: Three `mapMission` rows created each Monday midnight UTC; per-user
-`mapMissionProgress` updated on qualifying actions; all-three-complete triggers
-100-pt bonus.
-
-**Independent Test**: Monday cron creates 3 `mapMission` rows; submitting a POI
-increments a `contribute_poi` mission `progressCount`; completing all 3 creates
-`map_mission_completed` ledger entry.
-
-- [ ] T032 [US8] Implement weekly mission scheduler in
-      `api/src/jobs/mapMissions.ts` — `node-cron` Monday 00:00 UTC; insert 3
-      `mapMission` rows from template config
-      `api/src/config/map-mission-templates.json`; expire previous week's
-      `mapMissionProgress` rows to `expired`
-- [ ] T033 [US8] In `api/src/services/mapFeatureService.ts` and
-      `api/src/routes/map.ts`, after contribution or verification committed,
-      upsert `mapMissionProgress` (`UNIQUE(missionId, userId)`) for all active
-      missions matching the action type; if `progressCount >= targetCount` mark
-      `completed`
-- [ ] T034 [P] [US8] Check if all 3 current-week missions are `completed` for
-      user after each progress update — if so, insert `map_mission_completed`
-      `pointsLedger` entry (100 pts) and push notification
-
-**Checkpoint**: User Story 8 complete — weekly missions with bonus completion
-award are functional
+**Checkpoint**: US11 independently functional and testable.
 
 ---
 
-## Phase 10: User Story 6, 9, 10 — Browse Contributions, Neighbourhood Progress, Pioneer (Priority: P3)
+## Phase 7: User Story 4 - Map Badges & Milestones (Priority: P2)
 
-**US6**: Browse and filter pending contributions by bbox/type/age **US9**:
-Neighbourhood progress with zone completion percentage and threshold
-notifications **US10**: Pioneer bonus and map_pioneer/map_explorer badges
+**Goal**: Award map badges idempotently for contribution and verification
+milestones.
 
-- [ ] T035 [P] [US6] Implement `GET /api/map/features` with query params
-      `?bbox=lat1,lng1,lat2,lng2&type=poi|road_correction|area|route_stop&sort=oldest|newest`
-      in `api/src/routes/map.ts` — paginate 20 per page; application-layer bbox
-      filter on `geometry_json` centroid
-- [ ] T036 [P] [US9] Implement zone progress side-effect in `mapZoneService.ts`
-      — after zone `currentFeatureCount` increment: compute
-      `pct = currentFeatureCount / targetFeatureCount * 100`; write to
-      `HSET map:zone:{id} pct {value} featureCount {n}`; if crossing 50% band
-      send broadcast notification to zone contributors; if 100% award
-      `map_zone_complete` badge to all contributors (idempotent)
-- [ ] T037 [P] [US9] Implement `GET /api/map/zones` in `api/src/routes/map.ts` —
-      return all zones with cached completion % from Redis;
-      `GET /api/map/zones/:id` — zone detail with top 3 contributors by
-      `acceptedContributions`
-- [ ] T038 [P] [US10] Implement pioneer detection in `checkActivationThreshold`
-      in `mapFeatureService.ts` — after
-      `UPDATE mapZone SET currentFeatureCount += 1 RETURNING currentFeatureCount`:
-      if `RETURNING = 1` insert `map_pioneer_bonus` `pointsLedger` entry (75
-      pts) and award `map_pioneer` badge; trigger `map_explorer` badge check if
-      user has pioneered 3+ zones
-- [ ] T039 [P] [US6] Build verification swipe UI in
-      `apps/mobile/rider/src/screens/communityMap/VerificationStack.tsx` — stack
-      of `VerificationCard` components from `@hakwa/ui-native`; swipe left =
-      dispute, swipe right = confirm; call `POST /api/map/features/:id/verify`
-      on gesture end
+**Independent Test**: Badge worker awards map badges from map ledger/stats
+signals independent of transport badges.
+
+### Tests for User Story 4
+
+- [ ] T049 [P] [US4] Add badge evaluation unit tests for map milestones in
+      `workers/src/__tests__/mapBadges.test.ts`
+- [ ] T050 [P] [US4] Add integration tests for idempotent `user_badge` writes in
+      `api/tests/integration/map.badges.integration.test.ts`
+
+### Implementation for User Story 4
+
+- [ ] T051 [US4] Seed map badge definitions for passenger/operator actor types
+      in `pkg/db/seeds/mapBadges.ts`
+- [ ] T052 [US4] Extend badge evaluation pipeline for map milestones in
+      `workers/src/processors/badgeProcessor.ts`
+- [ ] T053 [P] [US4] Implement map badge notification payload adapters in
+      `pkg/notifications/src/templates/mapBadges.ts`
+- [ ] T054 [US4] Wire badge award side effects from map events in
+      `workers/src/processors/gamificationProcessor.ts`
+
+**Checkpoint**: US4 independently functional and testable.
 
 ---
 
-## Phase 11: User Story 11 — Admin Moderation Queue (Priority: P1)
+## Phase 8: User Story 5 - Map Leaderboard (Priority: P2)
 
-**Goal**: Moderators can review `pending_review` and `under_review` features via
-admin API; approve/reject with audit log; ban contributors.
+**Goal**: Monthly top-50 leaderboard with caller rank and archive rollover.
 
-**Independent Test**: `GET /admin/map/moderation/queue` returns features with
-`status IN (pending_review, under_review)` ordered by `createdAt ASC`; approve
-action transitions to `pending` and awards withheld points in a single atomic
-transaction.
+**Independent Test**: Redis sorted-set updates from map points are queryable
+through leaderboard API independent of feature activation.
 
-- [ ] T040 [US11] Implement `GET /admin/map/moderation/queue` in
-      `api/src/routes/admin/mapModeration.ts` — require `role = admin`;
-      paginated query
-      `WHERE status IN ('pending_review', 'under_review') ORDER BY created_at ASC`
-- [ ] T041 [US11] Implement `POST /admin/map/moderation/:id/approve` — if
-      `pending_review`: transition to `pending`, award withheld
-      `map_contribution` points, log to `mapModerationLog`; if `under_review`:
-      transition to `active`, invalidate Redis zone cache, notify contributor
-- [ ] T042 [P] [US11] Implement `POST /admin/map/moderation/:id/reject` —
-      transition to `rejected`; no point reversal; notify contributor; log to
-      `mapModerationLog`
-- [ ] T043 [P] [US11] Implement `POST /admin/map/contributors/:userId/ban` —
-      upsert `mapContributorTrust` with `isBanned = true`, `banReason`,
-      `banExpiresAt`; log to `mapModerationLog`
+### Tests for User Story 5
 
-**Checkpoint**: User Story 11 complete — three-layer safety (content screener +
-community reports + admin moderation) is operational
+- [ ] T055 [P] [US5] Add contract tests for `GET /api/v1/map/leaderboard` in
+      `api/tests/contract/map.leaderboard.contract.test.ts`
+- [ ] T056 [P] [US5] Add integration tests for monthly rollover and caller rank
+      card in `api/tests/integration/map.leaderboard.integration.test.ts`
 
----
+### Implementation for User Story 5
 
-## Final Phase: Polish & Cross-Cutting Concerns
+- [ ] T057 [US5] Implement leaderboard score write-through from map points
+      events in `workers/src/processors/gamificationProcessor.ts`
+- [ ] T058 [US5] Implement `GET /api/v1/map/leaderboard` endpoint in
+      `api/src/routes/map.ts`
+- [ ] T059 [P] [US5] Implement leaderboard enrichment query (display name,
+      counts) in `api/src/services/mapLeaderboardService.ts`
+- [ ] T060 [US5] Implement monthly leaderboard rollover/archive scheduler in
+      `api/src/jobs/mapLeaderboardRolloverJob.ts`
 
-- [ ] T044 [P] Publish `map_contribution` events to gamification notifier so
-      `@hakwa/notifications` fires push: _"You earned 25 pts for your map
-      contribution!"_
-- [ ] T045 [P] Add `map_contribution` and `map_verification` actions to
-      `gamificationProcessor.ts` event handler routing
-- [ ] T046 [P] Implement nightly abuse-check job in
-      `api/src/jobs/mapAbuseCheck.ts` — aggregation query over
-      `mapVerification + mapFeature` to detect mutual confirmation pairs within
-      30 days; upsert `mapAbuseFlag` rows (read-only enforcement; human review
-      required)
-- [ ] T047 [P] Build `ContributionSheet` component in `@hakwa/ui-native` — name
-      input, category picker, optional note and photo attachment; shown on map
-      long-press
-- [ ] T048 [P] Build `VerificationCard` component in `@hakwa/ui-native` — shows
-      name, type, photo, submitter first-name; Confirm/Dispute buttons with
-      optional note
+**Checkpoint**: US5 independently functional and testable.
 
 ---
 
-## Dependencies
+## Phase 9: User Story 7 - Passive Road Tracing (Priority: P2)
 
-```
-Phase 1 (Schema) → Phase 2 (Safety utilities) → Phase 3 (Submit + Safety enforcement) ← CRITICAL PATH
-Phase 3 (mapFeature exists) → Phase 4 (Verify) → Phase 5 (Activation transitions)
-Phase 5 → Phase 6 (Map badges after activation stats exist)
-Phase 5 → Phase 7 (Leaderboard after points awarded)
-Phase 2 → Phase 8 (US7 road tracing after tripService integration)
-Phase 3 → Phase 9 (US8 missions after contribution actions exist)
-Phase 5 → Phase 10 (US9/US10 zone/pioneer after activation hook exists)
-Phase 2+3 → Phase 11 (Admin moderation after screener + report exist)
-```
+**Goal**: Opted-in driver trips produce processed road traces and capped points
+for novel kilometers.
 
-## Parallel Execution Examples
+**Independent Test**: Completed trip with tracing enabled creates
+`map_road_trace` record and capped points via worker without manual user action.
 
-- T003 + T004 + T005 + T006 + T007 can run in parallel (separate table
-  definitions)
-- T011 + T013 + T014 can run in parallel (screener, velocity check, geo utils)
-- T016 + T017 can run in parallel (report route vs pending layer GET)
-- T035 + T036 + T037 + T038 can run in parallel (independent P3 features)
-- T040 + T041 + T042 + T043 can run in parallel (separate moderation endpoints)
+### Tests for User Story 7
+
+- [ ] T061 [P] [US7] Add worker unit tests for novel-km detection and daily cap
+      in `workers/src/__tests__/mapRoadTraceProcessor.test.ts`
+- [ ] T062 [P] [US7] Add integration tests for opt-in/opt-out behavior on trip
+      completion hook in
+      `api/tests/integration/map.roadtrace.integration.test.ts`
+
+### Implementation for User Story 7
+
+- [ ] T063 [US7] Publish trip-completed tracing job for opted-in drivers in
+      `api/src/services/tripLifecycleService.ts`
+- [ ] T064 [US7] Implement road trace processor (RDP simplify + novel-km calc)
+      in `workers/src/processors/mapRoadTraceProcessor.ts`
+- [ ] T065 [P] [US7] Persist processed traces and awarded points in
+      `api/src/services/mapRoadTraceService.ts`
+- [ ] T066 [US7] Implement post-trip tracing toast notification dispatch in
+      `pkg/notifications/src/templates/mapRoadTrace.ts`
+
+**Checkpoint**: US7 independently functional and testable.
+
+---
+
+## Phase 10: User Story 8 - Weekly Map Missions (Priority: P2)
+
+**Goal**: Weekly mission generation, per-user progress tracking, and completion
+bonus.
+
+**Independent Test**: User can complete 3 active missions in a week and receives
+mission-complete bonus points.
+
+### Tests for User Story 8
+
+- [ ] T067 [P] [US8] Add contract tests for mission endpoints in
+      `api/tests/contract/map.missions.contract.test.ts`
+- [ ] T068 [P] [US8] Add integration tests for mission completion and expiry
+      behavior in `api/tests/integration/map.missions.integration.test.ts`
+
+### Implementation for User Story 8
+
+- [ ] T069 [US8] Implement weekly mission creation scheduler in
+      `api/src/jobs/mapWeeklyMissionJob.ts`
+- [ ] T070 [US8] Implement mission progress updater on map actions in
+      `api/src/services/mapMissionService.ts`
+- [ ] T071 [P] [US8] Implement mission endpoints (`GET /missions`,
+      `GET /missions/me`) in `api/src/routes/map.ts`
+- [ ] T072 [US8] Implement mission completion/expiry notifications and bonus
+      points dispatch in `workers/src/processors/mapMissionProcessor.ts`
+
+**Checkpoint**: US8 independently functional and testable.
+
+---
+
+## Phase 11: User Story 6 - Browse & Filter Pending Contributions (Priority: P3)
+
+**Goal**: Efficient pending-feature browsing with bbox/type/age filters and
+swipe verification flow.
+
+**Independent Test**: Pending endpoint returns paginated filtered records
+without dependence on leaderboard/badges.
+
+### Tests for User Story 6
+
+- [ ] T073 [P] [US6] Add contract tests for pending browse query params in
+      `api/tests/contract/map.pendingBrowse.contract.test.ts`
+- [ ] T074 [P] [US6] Add integration tests for pagination, sort order, and
+      filters in `api/tests/integration/map.pendingBrowse.integration.test.ts`
+
+### Implementation for User Story 6
+
+- [ ] T075 [US6] Implement pending browse query service with bbox/type/age
+      filters in `api/src/services/mapQueryService.ts`
+- [ ] T076 [P] [US6] Add map pending list and filter state hooks in
+      `pkg/api-client/src/hooks/useMapPendingFeatures.ts`
+- [ ] T077 [P] [US6] Implement passenger app community map list/card flow in
+      `apps/mobile/passenger/src/features/map/CommunityMapScreen.tsx`
+- [ ] T078 [US6] Implement driver app swipe-to-verify flow in
+      `apps/mobile/driver/src/features/map/CommunityMapScreen.tsx`
+
+**Checkpoint**: US6 independently functional and testable.
+
+---
+
+## Phase 12: User Story 9 - Neighbourhood Progress Map (Priority: P3)
+
+**Goal**: Zone completion percentages, threshold notifications, and zone detail
+with top contributors.
+
+**Independent Test**: Feature activation updates zone counters and cached
+percent independent of mission/tracing systems.
+
+### Tests for User Story 9
+
+- [ ] T079 [P] [US9] Add integration tests for zone percentage updates and
+      50/100% triggers in
+      `api/tests/integration/map.zoneProgress.integration.test.ts`
+- [ ] T080 [P] [US9] Add contract tests for zone detail endpoint in
+      `api/tests/contract/map.zone.contract.test.ts`
+
+### Implementation for User Story 9
+
+- [ ] T081 [US9] Implement zone progress update handler on feature activation in
+      `api/src/services/mapZoneService.ts`
+- [ ] T082 [P] [US9] Implement zone percentage cache updates in
+      `api/src/services/mapRedisService.ts`
+- [ ] T083 [US9] Implement zone detail endpoint with top-3 contributors in
+      `api/src/routes/map.ts`
+
+**Checkpoint**: US9 independently functional and testable.
+
+---
+
+## Phase 13: User Story 10 - First Discoverer Bonus (Priority: P3)
+
+**Goal**: Award pioneer bonus and explorer progression based on first activation
+in zone.
+
+**Independent Test**: Transitioning a zone from 0 to 1 active feature awards
+pioneer bonus exactly once in race-safe manner.
+
+### Tests for User Story 10
+
+- [ ] T084 [P] [US10] Add concurrency tests for race-safe pioneer award in
+      `api/tests/integration/map.pioneer.concurrency.test.ts`
+- [ ] T085 [P] [US10] Add integration tests for explorer badge after 3 pioneered
+      zones in `api/tests/integration/map.pioneer.integration.test.ts`
+
+### Implementation for User Story 10
+
+- [ ] T086 [US10] Implement pioneer award logic on atomic zone increment in
+      `api/src/services/mapZoneService.ts`
+- [ ] T087 [P] [US10] Implement pioneer/explorer badge trigger plumbing in
+      `workers/src/processors/badgeProcessor.ts`
+- [ ] T088 [US10] Implement pioneer label visibility rules for zone detail cards
+      in `api/src/services/mapZoneService.ts`
+
+**Checkpoint**: US10 independently functional and testable.
+
+---
+
+## Phase 14: Polish & Cross-Cutting Concerns
+
+**Purpose**: Hardening, documentation, performance checks, and end-to-end
+validation.
+
+- [ ] T089 [P] Add end-to-end map feature happy-path test (submit -> verify ->
+      activate) in `api/tests/e2e/map.happyPath.e2e.test.ts`
+- [ ] T090 [P] Add load/perf benchmarks for submit and pending endpoints in
+      `api/tests/perf/map.perf.test.ts`
+- [ ] T091 Add OpenAPI/request docs and response examples for map APIs in
+      `api/docs/map-api.md`
+- [ ] T092 Add quickstart verification updates and command list in
+      `specs/009-hakwa-maps-crowdsourcing/quickstart.md`
+- [ ] T093 Add operational runbook (jobs, Redis keys, moderation workflow) in
+      `docs/runbooks/map-crowdsourcing.md`
+- [ ] T094 Run full validation checklist and capture completion status in
+      `specs/009-hakwa-maps-crowdsourcing/checklists/requirements.md`
+
+---
+
+## Dependencies & Execution Order
+
+### Phase Dependencies
+
+- **Phase 1 (Setup)**: Starts immediately.
+- **Phase 2 (Foundational)**: Depends on Phase 1 and blocks all user stories.
+- **P1 stories**: US1, US2, US3, US11 after Phase 2.
+- **P2 stories**: US4, US5, US7, US8 after required P1 interfaces are stable.
+- **P3 stories**: US6, US9, US10 after base map APIs and zone services are
+  available.
+- **Phase 14 (Polish)**: After selected story scope is complete.
+
+### User Story Dependencies
+
+- **US1 (P1)**: Depends only on foundational phase.
+- **US2 (P1)**: Depends on US1 feature creation API and pending query surface.
+- **US3 (P1)**: Depends on US2 vote writes.
+- **US11 (P1)**: Depends on US1 submission flow and core moderation schema.
+- **US4 (P2)**: Depends on US1/US2/US3 map events and contributor stats.
+- **US5 (P2)**: Depends on US1/US2/US3 points events.
+- **US7 (P2)**: Depends on foundational worker plumbing and trip lifecycle
+  hooks.
+- **US8 (P2)**: Depends on core map action events from US1/US2.
+- **US6 (P3)**: Depends on US1 pending endpoint and US2 verification endpoint.
+- **US9 (P3)**: Depends on US3 activation and zone updates.
+- **US10 (P3)**: Depends on US9 zone counting and US3 activation events.
+
+### Within Each User Story
+
+- Tests first (must fail before implementation).
+- API contract and validation before UI integration.
+- Service logic before scheduler/notification side effects.
+- Concurrency-sensitive transitions before feature completion sign-off.
+
+---
+
+## Parallel Opportunities
+
+- Setup tasks marked `[P]` can run concurrently (`T002`-`T009` except
+  dependency-ordered schema work).
+- Foundational tasks marked `[P]` (`T011`, `T012`, `T015`, `T016`) can run in
+  parallel once table scaffolding begins.
+- Within each user story, test tasks and isolated client/server tasks marked
+  `[P]` can execute concurrently.
+
+### Parallel Example: User Story 1
+
+- Run `T019` and `T020` in parallel while API shape stabilizes.
+- Run `T023` and `T024` in parallel after `T021` route scaffold is created.
+
+### Parallel Example: User Story 2
+
+- Run `T027` and `T028` in parallel.
+- Run `T031` and `T032` in parallel after `T029` endpoint contract is fixed.
+
+### Parallel Example: User Story 3
+
+- Run `T034` and `T035` in parallel.
+- Run `T037` and `T038` in parallel after `T036` transition logic is merged.
+
+### Parallel Example: User Story 11
+
+- Run `T041` and `T042` in parallel.
+- Run `T046` and `T047` in parallel after `T044` moderator route contracts
+  exist.
+
+### Parallel Example: User Story 4
+
+- Run `T049` and `T050` in parallel.
+- Run `T053` and `T054` in parallel after `T052` milestone checks are in place.
+
+### Parallel Example: User Story 5
+
+- Run `T055` and `T056` in parallel.
+- Run `T058` and `T059` in parallel once Redis score writes (`T057`) are
+  available.
+
+### Parallel Example: User Story 7
+
+- Run `T061` and `T062` in parallel.
+- Run `T065` and `T066` in parallel after worker processor (`T064`) exists.
+
+### Parallel Example: User Story 8
+
+- Run `T067` and `T068` in parallel.
+- Run `T071` and `T072` in parallel after mission progress service (`T070`) is
+  in place.
+
+### Parallel Example: User Story 6
+
+- Run `T073` and `T074` in parallel.
+- Run `T076` and `T077` in parallel after pending query service (`T075`) is
+  merged.
+
+### Parallel Example: User Story 9
+
+- Run `T079` and `T080` in parallel.
+- Run `T082` and `T083` in parallel after core zone progression (`T081`) is
+  merged.
+
+### Parallel Example: User Story 10
+
+- Run `T084` and `T085` in parallel.
+- Run `T087` and `T088` in parallel after pioneer core logic (`T086`) is
+  complete.
+
+---
 
 ## Implementation Strategy
 
-- **MVP**: Phase 1 + Phase 2 + Phase 3 (T001–T017) — contribution submission
-  with safety enforcement
-- **MVP+**: Add Phase 4 + Phase 5 (T018–T024) — verification + feature
-  activation pipeline
-- **Full P2**: Add Phase 6–9 (T025–T034) — badges, leaderboard, road tracing,
-  missions
-- **Complete**: Add Phase 10 + 11 + Polish (T035–T048)
+### MVP First (US1)
 
-**Total tasks**: 48 | **Parallelizable**: 22 | **User stories**: 11
+1. Complete Phase 1 and Phase 2.
+2. Complete US1 (Phase 3).
+3. Validate independent US1 test criteria and demo contribution flow.
+
+### Priority Delivery
+
+1. Deliver P1 set: US1 -> US2 -> US3 -> US11.
+2. Deliver P2 set: US4 -> US5 -> US7 -> US8.
+3. Deliver P3 set: US6 -> US9 -> US10.
+4. Finish Phase 14 hardening and runbook work.
+
+### Team Parallelization
+
+1. Team A: Core API lifecycle (US1-US3).
+2. Team B: Safety/moderation track (US11).
+3. Team C: Gamification/leaderboard/missions (US4-US5-US8).
+4. Team D: Client UX and zone/pioneer experiences (US6-US9-US10).
+
+---
+
+## Notes
+
+- All tasks follow strict checklist format: checkbox, task ID, optional `[P]`,
+  required story label for story phases, and explicit file path.
+- Story phases are independently testable by design.
+- Keep all cross-package contracts centralized in shared workspace packages.

@@ -165,14 +165,14 @@ active trip screen without manual navigation.
 - [x] T017 [US2] Implement `DELETE /api/devices/:id` in
       `api/src/routes/devices.ts` — session required; verify ownership; set
       `active = false` (do not hard-delete)
-- [ ] T018 [P] [US2] Implement `usePushRegistration.ts` hook in
+- [x] T018 [P] [US2] Implement `usePushRegistration.ts` hook in
       `apps/mobile/rider/src/hooks/usePushRegistration.ts` — on app foreground,
       call `Notifications.getExpoPushTokenAsync()`; call `POST /api/devices`
       with token + platform; handle permission denied gracefully
-- [ ] T019 [P] [US2] Copy `usePushRegistration.ts` pattern to
+- [x] T019 [P] [US2] Copy `usePushRegistration.ts` pattern to
       `apps/mobile/driver/src/hooks/usePushRegistration.ts` and
       `apps/mobile/merchant/src/hooks/usePushRegistration.ts`
-- [ ] T020 [P] [US2] Configure Expo deep-link handler in each mobile app
+- [x] T020 [P] [US2] Configure Expo deep-link handler in each mobile app
       (`app.json` scheme + `LinkingConfiguration.ts`) — map `booking`, `trip`,
       `wallet`, `badge` deep-link paths to correct screens
 
@@ -207,7 +207,7 @@ dispatching.
       `PATCH /api/me/notification-preferences/:type/:channel` in
       `api/src/routes/notifications.ts` — validate type is not `system_alert`
       (return 403 if so); update `enabled` in DB
-- [ ] T025 [P] [US3] Build notification preferences screen in
+- [x] T025 [P] [US3] Build notification preferences screen in
       `apps/mobile/rider/src/screens/NotificationPreferencesScreen.tsx` —
       grouped toggles by notification type with channel columns; `system_alert`
       rows non-interactive
@@ -242,11 +242,11 @@ arrives while centre is open → appends to top of list instantly.
       when in-app notification inserted; `DECR` on mark-as-read; return counter
       from `GET /api/notifications` as `unreadCount` header; WebSocket push
       updated count on change
-- [ ] T030 [P] [US4] Build `NotificationsScreen.tsx` in
+- [x] T030 [P] [US4] Build `NotificationsScreen.tsx` in
       `apps/mobile/rider/src/screens/NotificationsScreen.tsx` —
       `useNotifications` TanStack Query hook; skeleton list on first load;
       real-time prepend on WebSocket event; tap → mark read + deep-link
-- [ ] T031 [P] [US4] Show unread badge on notification bell in navigation bar in
+- [x] T031 [P] [US4] Show unread badge on notification bell in navigation bar in
       all three mobile apps — subscribe to `user:{userId}:notifications`
       WebSocket event for live count updates
 
@@ -298,7 +298,7 @@ deduplication is operational
       `pkg/notifications/src/types.ts`); if `retryCount >= MAX_RETRY_COUNT` set
       `status = 'failed'` and `errorDetail = receipt.message` with no further
       re-queue
-- [ ] T036 [P] Add `NotificationsScreen` deep-link entry to driver and merchant
+- [x] T036 [P] Add `NotificationsScreen` deep-link entry to driver and merchant
       mobile apps matching rider pattern
 
 ---
