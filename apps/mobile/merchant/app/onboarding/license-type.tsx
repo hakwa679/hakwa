@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { useWizard } from "@/hooks/use-wizard";
-import { updateMerchantProfile } from "@/hooks/use-merchant-api";
 
 type LicenseType = "licensed" | "unlicensed";
 

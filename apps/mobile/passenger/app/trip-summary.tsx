@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Alert,
@@ -33,29 +33,38 @@ interface TripDetails {
 export default function TripSummaryScreen() {
   const router = useRouter();
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const [trip, setTrip] = useState<TripDetails | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [emailing, setEmailing] = useState(false);
-
-  useEffect(() => {
-    if (!tripId) return;
-    (async () => {
-      try {
-        const token = await SecureStore.getItemAsync("hakwa_token");
-        const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (res.ok) {
-          const data = (await res.json()) as TripDetails;
-          setTrip(data);
-        }
-      } catch {
-        // best-effort
-      } finally {
-        setLoading(false);
+  const tripSummaryQuery = useQuery({
+    queryKey: ["passenger", "trip-summary", tripId],
+    enabled: !!tripId,
+    queryFn: async () => {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        throw new Error("Failed to load trip summary");
       }
-    })();
-  }, [tripId]);
+      return (await res.json()) as TripDetails;
+    },
+  });
+
+  const emailMutation = useMutation({
+    mutationFn: async () => {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt/email`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!res.ok) {
+        throw new Error("Could not queue receipt email. Please try again.");
+      }
+    },
+  });
+
+  const trip = tripSummaryQuery.data ?? null;
+  const loading = tripSummaryQuery.isPending;
+  const emailing = emailMutation.isPending;
 
   if (loading) {
     return (
@@ -73,22 +82,8 @@ export default function TripSummaryScreen() {
 
   const onEmailReceipt = async () => {
     if (!tripId || emailing) return;
-
-    setEmailing(true);
     try {
-      const token = await SecureStore.getItemAsync("hakwa_token");
-      const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt/email`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      if (!res.ok) {
-        Alert.alert(
-          "Receipt",
-          "Could not queue receipt email. Please try again.",
-        );
-        return;
-      }
+      await emailMutation.mutateAsync();
 
       Alert.alert("Receipt", "Your receipt email has been queued.");
     } catch {
@@ -96,8 +91,6 @@ export default function TripSummaryScreen() {
         "Receipt",
         "Could not queue receipt email. Please try again.",
       );
-    } finally {
-      setEmailing(false);
     }
   };
 

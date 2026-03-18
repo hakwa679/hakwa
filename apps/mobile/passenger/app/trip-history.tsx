@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   FlatList,
@@ -25,50 +25,39 @@ interface TripRow {
 
 export default function TripHistoryScreen() {
   const router = useRouter();
-  const [trips, setTrips] = useState<TripRow[]>([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const tripsQuery = useInfiniteQuery({
+    queryKey: ["passenger-trips", "history"],
+    queryFn: async ({ pageParam }) => {
+      const token = await SecureStore.getItemAsync("session_token");
+      const page = typeof pageParam === "number" ? pageParam : 1;
+      const res = await fetch(
+        `${API_URL}/api/bookings/history?page=${page}&limit=20`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
-  const fetchPage = useCallback(
-    async (pageNum: number) => {
-      if (loading) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const token = await SecureStore.getItemAsync("session_token");
-        const res = await fetch(
-          `${API_URL}/api/bookings/history?page=${pageNum}&limit=20`,
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
-        if (!res.ok) throw new Error("Failed to load history");
-        const data: { trips: TripRow[]; hasMore: boolean } = await res.json();
-        setTrips((prev) =>
-          pageNum === 1 ? data.trips : [...prev, ...data.trips],
-        );
-        setHasMore(data.hasMore);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setLoading(false);
-        setInitialLoading(false);
+      if (!res.ok) {
+        throw new Error("Failed to load history");
       }
-    },
-    [loading],
-  );
 
-  useEffect(() => {
-    fetchPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      return (await res.json()) as { trips: TripRow[]; hasMore: boolean };
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      lastPage.hasMore ? Number(lastPageParam) + 1 : undefined,
+  });
+
+  const trips = tripsQuery.data?.pages.flatMap((page) => page.trips) ?? [];
+  const hasMore = tripsQuery.hasNextPage;
+  const loading = tripsQuery.isFetchingNextPage;
+  const initialLoading = tripsQuery.isPending;
+  const error =
+    tripsQuery.error instanceof Error ? tripsQuery.error.message : null;
 
   const loadMore = () => {
     if (!hasMore || loading) return;
-    const next = page + 1;
-    setPage(next);
-    fetchPage(next);
+    void tripsQuery.fetchNextPage();
   };
 
   const formatDate = (iso: string | null) => {
@@ -138,9 +127,7 @@ export default function TripHistoryScreen() {
         <Pressable
           style={styles.retryBtn}
           onPress={() => {
-            setInitialLoading(true);
-            setPage(1);
-            fetchPage(1);
+            void tripsQuery.refetch();
           }}
         >
           <Text style={styles.retryBtnText}>Retry</Text>

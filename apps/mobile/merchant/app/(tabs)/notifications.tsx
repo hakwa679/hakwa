@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   FlatList,
@@ -20,31 +21,30 @@ interface NotificationItem {
 }
 
 export default function MerchantNotificationsScreen() {
-  const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState<NotificationItem[]>([]);
-
-  const fetchNotifications = useCallback(async () => {
-    setLoading(true);
-    try {
+  const notificationsQuery = useQuery({
+    queryKey: ["merchant-notifications", "list"],
+    queryFn: async () => {
       const token = await SecureStore.getItemAsync(TOKEN_KEY);
-      if (!token) return;
+      if (!token) return [] as NotificationItem[];
 
       const res = await fetch(`${API_URL}/api/notifications?limit=30`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        throw new Error("Failed to load notifications");
+      }
 
       const body = (await res.json()) as { data?: NotificationItem[] };
-      setItems(body.data ?? []);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return body.data ?? [];
+    },
+  });
 
-  useEffect(() => {
-    void fetchNotifications();
-  }, [fetchNotifications]);
+  const items = useMemo(
+    () => notificationsQuery.data ?? [],
+    [notificationsQuery.data],
+  );
+  const loading = notificationsQuery.isPending;
 
   if (loading) {
     return (
@@ -68,7 +68,7 @@ export default function MerchantNotificationsScreen() {
       refreshControl={
         <RefreshControl
           refreshing={false}
-          onRefresh={() => void fetchNotifications()}
+          onRefresh={() => void notificationsQuery.refetch()}
         />
       }
       ListEmptyComponent={

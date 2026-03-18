@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Animated,
@@ -42,47 +43,30 @@ type Props = {
 };
 
 export function GamificationProfileCard(props: Props) {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<GamificationResponse | null>(null);
   const [levelUpMessage, setLevelUpMessage] = useState<string | null>(null);
   const [animatedProgress] = useState(() => new Animated.Value(0));
+  const gamificationQuery = useQuery({
+    queryKey: ["passenger", "gamification", "summary"],
+    queryFn: async () => {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(`${API_URL}/api/me/gamification`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
 
-  useEffect(() => {
-    let alive = true;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const token = await SecureStore.getItemAsync("hakwa_token");
-        const res = await fetch(`${API_URL}/api/me/gamification`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!res.ok) {
-          throw new Error(`Failed to load gamification (${res.status})`);
-        }
-
-        const json = (await res.json()) as GamificationResponse;
-        if (alive) {
-          setData(json);
-        }
-      } catch (err) {
-        if (alive) {
-          setError(err instanceof Error ? err.message : "Failed to load data");
-        }
-      } finally {
-        if (alive) {
-          setLoading(false);
-        }
+      if (!res.ok) {
+        throw new Error(`Failed to load gamification (${res.status})`);
       }
-    }
 
-    load();
-    return () => {
-      alive = false;
-    };
-  }, []);
+      return (await res.json()) as GamificationResponse;
+    },
+  });
+
+  const loading = gamificationQuery.isPending;
+  const error =
+    gamificationQuery.error instanceof Error
+      ? gamificationQuery.error.message
+      : null;
+  const data = gamificationQuery.data ?? null;
 
   const progress = useMemo(() => {
     if (!data) return 0;

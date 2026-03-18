@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   TextInput,
   Text,
@@ -20,24 +21,41 @@ export default function SignInScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [resendVisible, setResendVisible] = useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [loading, setLoading] = useState(false);
 
-  const canSubmit = email.trim().length > 0 && password.length > 0;
-
-  async function handleSignIn() {
-    if (!canSubmit || loading) return;
-    setLoading(true);
-    setError(null);
-    setResendVisible(false);
-    try {
+  const signInMutation = useMutation({
+    mutationFn: async () => {
       const res = await fetch(`${API_URL}/auth/sign-in/email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
       const data = (await res.json()) as Record<string, unknown>;
+      return { res, data };
+    },
+  });
+
+  const resendVerificationMutation = useMutation({
+    mutationFn: async () => {
+      await fetch(`${API_URL}/api/auth/resend-verification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+    },
+  });
+
+  const loading = signInMutation.isPending;
+  const resendLoading = resendVerificationMutation.isPending;
+
+  const canSubmit = email.trim().length > 0 && password.length > 0;
+
+  async function handleSignIn() {
+    if (!canSubmit || loading) return;
+    setError(null);
+    setResendVisible(false);
+    try {
+      const { res, data } = await signInMutation.mutateAsync();
       if (res.ok && data["token"]) {
         await SecureStore.setItemAsync(TOKEN_KEY, data["token"] as string);
         // Route to driver availability screen
@@ -56,20 +74,13 @@ export default function SignInScreen() {
       }
     } catch {
       setError("Network error. Please check your connection and try again.");
-    } finally {
-      setLoading(false);
     }
   }
 
   async function handleResendVerification() {
     if (resendCooldown > 0 || resendLoading) return;
-    setResendLoading(true);
     try {
-      await fetch(`${API_URL}/api/auth/resend-verification`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
-      });
+      await resendVerificationMutation.mutateAsync();
       setResendCooldown(60);
       const interval = setInterval(() => {
         setResendCooldown((c) => {
@@ -82,8 +93,6 @@ export default function SignInScreen() {
       }, 1000);
     } catch {
       // Silently ignore
-    } finally {
-      setResendLoading(false);
     }
   }
 

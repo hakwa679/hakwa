@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import {
+  InfiniteData,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import * as SecureStore from "expo-secure-store";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -27,103 +33,141 @@ interface ListResponse {
 }
 
 export function useNotifications() {
-  const [items, setItems] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
 
-  const fetchPage = useCallback(async (cursor?: string) => {
-    const token = await SecureStore.getItemAsync(TOKEN_KEY);
-    if (!token) return null;
+  const notificationsQueryKey = ["notifications", "list"] as const;
 
-    const query = new URLSearchParams({ limit: "20" });
-    if (cursor) query.set("cursor", cursor);
+  const notificationsQuery = useInfiniteQuery({
+    queryKey: notificationsQueryKey,
+    queryFn: async ({ pageParam }) => {
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      if (!token) {
+        return {
+          data: [],
+          nextCursor: null,
+          totalUnread: 0,
+        } satisfies ListResponse;
+      }
 
-    const res = await fetch(
-      `${API_URL}/api/notifications?${query.toString()}`,
-      {
+      const query = new URLSearchParams({ limit: "20" });
+      if (typeof pageParam === "string" && pageParam.length > 0) {
+        query.set("cursor", pageParam);
+      }
+
+      const res = await fetch(
+        `${API_URL}/api/notifications?${query.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to load notifications");
+      }
+
+      return (await res.json()) as ListResponse;
+    },
+    initialPageParam: "",
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  });
+
+  const items =
+    notificationsQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  const unreadCount = notificationsQuery.data?.pages[0]?.totalUnread ?? 0;
+
+  const markAsReadMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      if (!token) return null;
+
+      const res = await fetch(`${API_URL}/api/notifications/${id}/read`, {
+        method: "PATCH",
         headers: { Authorization: `Bearer ${token}` },
-      },
-    );
+      });
 
-    if (!res.ok) return null;
-    return (await res.json()) as ListResponse;
-  }, []);
+      if (!res.ok && res.status !== 409) {
+        throw new Error("Failed to mark notification as read");
+      }
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const body = await fetchPage();
-      if (!body) return;
-      setItems(body.data);
-      setNextCursor(body.nextCursor);
-      setUnreadCount(body.totalUnread);
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchPage]);
-
-  const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const body = await fetchPage(nextCursor);
-      if (!body) return;
-      setItems((prev) => [...prev, ...body.data]);
-      setNextCursor(body.nextCursor);
-      setUnreadCount(body.totalUnread);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [fetchPage, loadingMore, nextCursor]);
-
-  const markAsRead = useCallback(async (id: string) => {
-    const token = await SecureStore.getItemAsync(TOKEN_KEY);
-    if (!token) return;
-
-    const res = await fetch(`${API_URL}/api/notifications/${id}/read`, {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (res.ok || res.status === 409) {
       const body = (await res.json()) as { readAt: string };
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === id
-            ? { ...item, readAt: body.readAt ?? item.readAt }
-            : item,
-        ),
+      return { id, readAt: body.readAt ?? new Date().toISOString() };
+    },
+    onSuccess: (result) => {
+      if (!result) return;
+
+      queryClient.setQueryData<InfiniteData<ListResponse>>(
+        notificationsQueryKey,
+        (prev) => {
+          if (!prev) return prev;
+
+          let wasUnread = false;
+          const nextPages = prev.pages.map((page) => ({
+            ...page,
+            data: page.data.map((item) => {
+              if (item.id !== result.id) return item;
+              if (!item.readAt) wasUnread = true;
+              return { ...item, readAt: result.readAt };
+            }),
+          }));
+
+          if (!wasUnread) {
+            return { ...prev, pages: nextPages };
+          }
+
+          const first = nextPages[0];
+          nextPages[0] = {
+            ...first,
+            totalUnread: Math.max(0, first.totalUnread - 1),
+          };
+
+          return {
+            ...prev,
+            pages: nextPages,
+          };
+        },
       );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    }
-  }, []);
+    },
+  });
 
-  const markAllRead = useCallback(async () => {
-    const token = await SecureStore.getItemAsync(TOKEN_KEY);
-    if (!token) return;
+  const markAllReadMutation = useMutation({
+    mutationFn: async () => {
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      if (!token) return;
 
-    const res = await fetch(`${API_URL}/api/notifications/mark-all-read`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+      const res = await fetch(`${API_URL}/api/notifications/mark-all-read`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    if (res.ok) {
-      setItems((prev) =>
-        prev.map((item) => ({
-          ...item,
-          readAt: item.readAt ?? new Date().toISOString(),
-        })),
+      if (!res.ok) {
+        throw new Error("Failed to mark all notifications as read");
+      }
+    },
+    onSuccess: () => {
+      queryClient.setQueryData<InfiniteData<ListResponse>>(
+        notificationsQueryKey,
+        (prev) => {
+          if (!prev) return prev;
+
+          const now = new Date().toISOString();
+          const nextPages = prev.pages.map((page, index) => ({
+            ...page,
+            totalUnread: index === 0 ? 0 : page.totalUnread,
+            data: page.data.map((item) => ({
+              ...item,
+              readAt: item.readAt ?? now,
+            })),
+          }));
+
+          return {
+            ...prev,
+            pages: nextPages,
+          };
+        },
       );
-      setUnreadCount(0);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    },
+  });
 
   useEffect(() => {
     let active = true;
@@ -163,13 +207,42 @@ export function useNotifications() {
           createdAt: String(message["createdAt"] ?? new Date().toISOString()),
         };
 
-        setItems((prev) => {
-          if (!incoming.id || prev.some((item) => item.id === incoming.id)) {
-            return prev;
-          }
-          return [incoming, ...prev];
-        });
-        setUnreadCount((prev) => prev + 1);
+        queryClient.setQueryData<InfiniteData<ListResponse>>(
+          notificationsQueryKey,
+          (prev) => {
+            if (!prev) {
+              return {
+                pageParams: [""],
+                pages: [
+                  {
+                    data: [incoming],
+                    nextCursor: null,
+                    totalUnread: 1,
+                  },
+                ],
+              };
+            }
+
+            const firstPage = prev.pages[0];
+            if (
+              !incoming.id ||
+              firstPage.data.some((item) => item.id === incoming.id)
+            ) {
+              return prev;
+            }
+
+            const updatedFirst = {
+              ...firstPage,
+              data: [incoming, ...firstPage.data],
+              totalUnread: firstPage.totalUnread + 1,
+            };
+
+            return {
+              ...prev,
+              pages: [updatedFirst, ...prev.pages.slice(1)],
+            };
+          },
+        );
       };
 
       ws.onclose = () => {
@@ -187,16 +260,16 @@ export function useNotifications() {
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       wsRef.current?.close();
     };
-  }, []);
+  }, [queryClient]);
 
   return {
     items,
-    loading,
-    loadingMore,
+    loading: notificationsQuery.isPending,
+    loadingMore: notificationsQuery.isFetchingNextPage,
     unreadCount,
-    refresh,
-    loadMore,
-    markAsRead,
-    markAllRead,
+    refresh: notificationsQuery.refetch,
+    loadMore: notificationsQuery.fetchNextPage,
+    markAsRead: markAsReadMutation.mutateAsync,
+    markAllRead: markAllReadMutation.mutateAsync,
   };
 }

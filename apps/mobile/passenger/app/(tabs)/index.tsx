@@ -1,4 +1,5 @@
 import { useRouter } from "expo-router";
+import { useMutation } from "@tanstack/react-query";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { GamificationProfileCard } from "../../src/components/GamificationProfileCard";
@@ -8,13 +9,19 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 export default function HomeScreen() {
   const router = useRouter();
 
-  async function handleSignOut() {
-    try {
+  const signOutMutation = useMutation({
+    mutationFn: async () => {
       const token = await SecureStore.getItemAsync("hakwa_token");
       await fetch(`${API_URL}/auth/sign-out`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+    },
+  });
+
+  async function handleSignOut() {
+    try {
+      await signOutMutation.mutateAsync();
     } catch {
       // best-effort
     } finally {

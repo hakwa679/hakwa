@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import {
   DarkTheme,
   DefaultTheme,
@@ -20,6 +21,7 @@ import {
   startPassengerMapQueueBootstrap,
   stopPassengerMapQueueBootstrap,
 } from "./bootstrap/mapQueueBootstrap";
+import { queryClient } from "@/src/lib/queryClient";
 
 export const TOKEN_KEY = "hakwa_token";
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
@@ -28,14 +30,34 @@ export const unstable_settings = {
   anchor: "(tabs)",
 };
 
-export default function RootLayout() {
+async function restorePassengerSession(): Promise<boolean> {
+  try {
+    const token = await SecureStore.getItemAsync(TOKEN_KEY);
+    if (!token) return false;
+
+    const res = await fetch(`${API_URL}/api/auth/session`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (res.ok) return true;
+
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function RootLayoutContent() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const segments = useSegments();
   const url = Linking.useURL();
-
-  // null = loading, false = unauthenticated, true = authenticated
-  const [authReady, setAuthReady] = useState<boolean | null>(null);
+  const { data: authReady = false, isPending } = useQuery({
+    queryKey: ["passenger", "auth-session"],
+    queryFn: restorePassengerSession,
+    retry: false,
+  });
 
   usePushRegistration((data) => {
     routeNotificationData(router, data);
@@ -48,34 +70,9 @@ export default function RootLayout() {
     };
   }, []);
 
-  // Step 1: Restore session from SecureStore on launch
-  useEffect(() => {
-    async function restoreSession() {
-      try {
-        const token = await SecureStore.getItemAsync(TOKEN_KEY);
-        if (!token) {
-          setAuthReady(false);
-          return;
-        }
-        const res = await fetch(`${API_URL}/api/auth/session`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          setAuthReady(true);
-        } else {
-          await SecureStore.deleteItemAsync(TOKEN_KEY);
-          setAuthReady(false);
-        }
-      } catch {
-        setAuthReady(false);
-      }
-    }
-    restoreSession();
-  }, []);
-
   // Step 2: Route based on auth state
   useEffect(() => {
-    if (authReady === null) return; // still loading
+    if (isPending) return;
     const inAuthGroup = segments[0] === "auth";
     if (!authReady && !inAuthGroup) {
       router.replace("/auth/sign-in");
@@ -83,7 +80,7 @@ export default function RootLayout() {
       // Passenger home is the booking tab
       router.replace("/(tabs)");
     }
-  }, [authReady, segments]);
+  }, [authReady, isPending, segments]);
 
   // Step 3: Handle deep links (email verification, password reset)
   useEffect(() => {
@@ -118,7 +115,7 @@ export default function RootLayout() {
   }
 
   // Don't render any screens until auth check is complete
-  if (authReady === null) return null;
+  if (isPending) return null;
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
@@ -154,5 +151,13 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RootLayoutContent />
+    </QueryClientProvider>
   );
 }

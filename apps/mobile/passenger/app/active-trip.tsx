@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   Alert,
   Pressable,
@@ -70,6 +71,23 @@ export default function ActiveTripScreen() {
     tripId: tripId ?? null,
     enabled: !!tripId,
   });
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(`${API_URL}/api/bookings/${tripId ?? ""}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        const err = (await res.json()) as { message?: string };
+        throw new Error(err.message ?? "Could not cancel");
+      }
+    },
+  });
 
   // T018 — status banner transitions
   useEffect(() => {
@@ -97,18 +115,7 @@ export default function ActiveTripScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            const token = await SecureStore.getItemAsync("hakwa_token");
-            const res = await fetch(`${API_URL}/api/bookings/${tripId ?? ""}`, {
-              method: "DELETE",
-              headers: {
-                "Content-Type": "application/json",
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-              },
-            });
-            if (!res.ok) {
-              const err = (await res.json()) as { message?: string };
-              throw new Error(err.message ?? "Could not cancel");
-            }
+            await cancelMutation.mutateAsync();
             router.replace("/booking");
           } catch (err) {
             Alert.alert(

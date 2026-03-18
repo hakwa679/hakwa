@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   TextInput,
   Text,
@@ -16,15 +17,10 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit() {
-    if (!email.trim() || loading) return;
-    setLoading(true);
-    setError(null);
-    try {
-      // Always returns 200 regardless of whether the email exists — prevents account enumeration
+  const forgotPasswordMutation = useMutation({
+    mutationFn: async () => {
       await fetch(`${API_URL}/auth/forget-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -33,11 +29,20 @@ export default function ForgotPasswordScreen() {
           redirectTo: `${process.env.EXPO_PUBLIC_WEB_URL ?? "https://portal.hakwa.af"}/auth/reset-password`,
         }),
       });
+    },
+  });
+
+  const loading = forgotPasswordMutation.isPending;
+
+  async function handleSubmit() {
+    if (!email.trim() || loading) return;
+    setError(null);
+    try {
+      // Always returns 200 regardless of whether the email exists — prevents account enumeration
+      await forgotPasswordMutation.mutateAsync();
       setSubmitted(true);
     } catch {
       setError("Network error. Please check your connection and try again.");
-    } finally {
-      setLoading(false);
     }
   }
 

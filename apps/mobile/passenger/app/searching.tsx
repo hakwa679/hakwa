@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +22,23 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 export default function SearchingScreen() {
   const router = useRouter();
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(`${API_URL}/api/bookings/${tripId ?? ""}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (!res.ok) {
+        const err = (await res.json()) as { message?: string };
+        throw new Error(err.message ?? "Could not cancel");
+      }
+    },
+  });
 
   const { status, driverInfo, connected } = useBookingWebSocket({
     tripId: tripId ?? null,
@@ -58,21 +76,7 @@ export default function SearchingScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              const token = await SecureStore.getItemAsync("hakwa_token");
-              const res = await fetch(
-                `${API_URL}/api/bookings/${tripId ?? ""}`,
-                {
-                  method: "DELETE",
-                  headers: {
-                    "Content-Type": "application/json",
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                  },
-                },
-              );
-              if (!res.ok) {
-                const err = (await res.json()) as { message?: string };
-                throw new Error(err.message ?? "Could not cancel");
-              }
+              await cancelMutation.mutateAsync();
               router.replace("/booking");
             } catch (err) {
               Alert.alert(

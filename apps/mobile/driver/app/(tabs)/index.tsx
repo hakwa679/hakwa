@@ -1,5 +1,6 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import AvailabilityScreen from "../../src/screens/AvailabilityScreen";
@@ -38,6 +39,15 @@ interface ActiveTrip {
 export default function HomeScreen() {
   const router = useRouter();
   const [activeTrip, setActiveTrip] = useState<ActiveTrip | null>(null);
+  const signOutMutation = useMutation({
+    mutationFn: async () => {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      await fetch(`${API_URL}/auth/sign-out`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    },
+  });
 
   const { currentOffer, clearOffer } = useDriverOfferWebSocket();
 
@@ -47,11 +57,7 @@ export default function HomeScreen() {
 
   async function handleSignOut() {
     try {
-      const token = await SecureStore.getItemAsync("hakwa_token");
-      await fetch(`${API_URL}/auth/sign-out`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      await signOutMutation.mutateAsync();
     } catch {
       // best-effort
     } finally {

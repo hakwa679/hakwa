@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   ScrollView,
@@ -23,31 +24,36 @@ interface PreferenceRow {
 type PreferencesByType = Record<string, PreferenceRow[]>;
 
 export default function NotificationPreferencesScreen() {
-  const [loading, setLoading] = useState(true);
-  const [preferences, setPreferences] = useState<PreferencesByType>({});
+  const queryClient = useQueryClient();
+  const preferencesQueryKey = [
+    "notification-preferences",
+    "passenger",
+  ] as const;
 
-  const fetchPreferences = useCallback(async () => {
-    setLoading(true);
-    try {
+  const preferencesQuery = useQuery({
+    queryKey: preferencesQueryKey,
+    queryFn: async () => {
       const token = await SecureStore.getItemAsync(TOKEN_KEY);
-      if (!token) return;
+      if (!token) return {} as PreferencesByType;
+
       const res = await fetch(
         `${API_URL}/api/notifications/me/notification-preferences`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-      if (!res.ok) return;
-      const body = (await res.json()) as { preferences?: PreferencesByType };
-      setPreferences(body.preferences ?? {});
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
-  useEffect(() => {
-    void fetchPreferences();
-  }, [fetchPreferences]);
+      if (!res.ok) {
+        throw new Error("Failed to load notification preferences");
+      }
+
+      const body = (await res.json()) as { preferences?: PreferencesByType };
+      return body.preferences ?? {};
+    },
+  });
+
+  const preferences = preferencesQuery.data ?? {};
+  const loading = preferencesQuery.isPending;
 
   const grouped = useMemo(
     () =>
@@ -57,35 +63,52 @@ export default function NotificationPreferencesScreen() {
     [preferences],
   );
 
-  const updatePreference = async (
-    type: string,
-    channel: Channel,
-    enabled: boolean,
-  ) => {
-    const token = await SecureStore.getItemAsync(TOKEN_KEY);
-    if (!token) return;
+  const updatePreferenceMutation = useMutation({
+    mutationFn: async ({
+      type,
+      channel,
+      enabled,
+    }: {
+      type: string;
+      channel: Channel;
+      enabled: boolean;
+    }) => {
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      if (!token) return;
 
-    const res = await fetch(
-      `${API_URL}/api/notifications/me/notification-preferences/${encodeURIComponent(type)}/${encodeURIComponent(channel)}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        `${API_URL}/api/notifications/me/notification-preferences/${encodeURIComponent(type)}/${encodeURIComponent(channel)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ enabled }),
         },
-        body: JSON.stringify({ enabled }),
-      },
-    );
+      );
 
-    if (!res.ok) return;
+      if (!res.ok) {
+        throw new Error("Failed to update preference");
+      }
 
-    setPreferences((prev) => ({
-      ...prev,
-      [type]: (prev[type] ?? []).map((row) =>
-        row.channel === channel ? { ...row, enabled } : row,
-      ),
-    }));
-  };
+      return { type, channel, enabled };
+    },
+    onSuccess: (result) => {
+      if (!result) return;
+      queryClient.setQueryData<PreferencesByType>(
+        preferencesQueryKey,
+        (prev) => ({
+          ...(prev ?? {}),
+          [result.type]: ((prev ?? {})[result.type] ?? []).map((row) =>
+            row.channel === result.channel
+              ? { ...row, enabled: result.enabled }
+              : row,
+          ),
+        }),
+      );
+    },
+  });
 
   if (loading) {
     return (
@@ -132,7 +155,11 @@ export default function NotificationPreferencesScreen() {
                   value={row.enabled}
                   disabled={row.locked}
                   onValueChange={(value) => {
-                    void updatePreference(type, row.channel, value);
+                    void updatePreferenceMutation.mutateAsync({
+                      type,
+                      channel: row.channel,
+                      enabled: value,
+                    });
                   }}
                 />
               </View>

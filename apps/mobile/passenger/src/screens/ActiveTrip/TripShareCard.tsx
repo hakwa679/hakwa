@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import * as SecureStore from "expo-secure-store";
 
@@ -6,33 +7,54 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export default function TripShareCard({ tripId }: { tripId?: string }) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const createShareMutation = useMutation({
+    mutationFn: async () => {
+      if (!tripId) return null;
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(
+        `${API_URL}/api/v1/safety/trips/${tripId}/share`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        },
+      );
+      if (!res.ok) {
+        throw new Error("Unable to create share link.");
+      }
+      return (await res.json()) as { shareUrl?: string };
+    },
+    onSuccess: (payload) => {
+      setShareUrl(payload?.shareUrl ?? null);
+    },
+  });
+
+  const revokeShareMutation = useMutation({
+    mutationFn: async () => {
+      if (!tripId) return;
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      await fetch(`${API_URL}/api/v1/safety/trips/${tripId}/share`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    },
+    onSuccess: () => {
+      setShareUrl(null);
+    },
+  });
 
   async function createShare() {
-    if (!tripId) return;
-    const token = await SecureStore.getItemAsync("hakwa_token");
-    const res = await fetch(`${API_URL}/api/v1/safety/trips/${tripId}/share`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!res.ok) {
+    try {
+      await createShareMutation.mutateAsync();
+    } catch {
       Alert.alert("Share failed", "Unable to create share link.");
-      return;
     }
-    const payload = (await res.json()) as { shareUrl?: string };
-    setShareUrl(payload.shareUrl ?? null);
   }
 
   async function revokeShare() {
-    if (!tripId) return;
-    const token = await SecureStore.getItemAsync("hakwa_token");
-    await fetch(`${API_URL}/api/v1/safety/trips/${tripId}/share`, {
-      method: "DELETE",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    setShareUrl(null);
+    await revokeShareMutation.mutateAsync();
   }
 
   return (

@@ -1,4 +1,10 @@
 import * as SecureStore from "expo-secure-store";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -248,4 +254,96 @@ export async function fetchPayoutDetail(
   }
 
   return json as MerchantPayoutDetail;
+}
+
+export const merchantQueryKeys = {
+  profile: ["merchant", "profile"] as const,
+  bankAccount: ["merchant", "bank-account"] as const,
+  vehicles: ["merchant", "vehicles"] as const,
+  payouts: ["merchant", "payouts"] as const,
+  payoutDetail: (payoutId: string) =>
+    ["merchant", "payouts", payoutId] as const,
+};
+
+export function useMerchantProfileQuery() {
+  return useQuery({
+    queryKey: merchantQueryKeys.profile,
+    queryFn: fetchMerchantProfile,
+  });
+}
+
+export function useUpdateMerchantProfileMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateMerchantProfile,
+    onSuccess: (profile) => {
+      queryClient.setQueryData(merchantQueryKeys.profile, profile);
+    },
+  });
+}
+
+export function useSubmitForReviewMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: submitForReview,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: merchantQueryKeys.profile,
+      });
+    },
+  });
+}
+
+export function useBankAccountQuery() {
+  return useQuery({
+    queryKey: merchantQueryKeys.bankAccount,
+    queryFn: fetchBankAccount,
+  });
+}
+
+export function useUpsertBankAccountMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: upsertBankAccount,
+    onSuccess: (bankAccount) => {
+      queryClient.setQueryData(merchantQueryKeys.bankAccount, bankAccount);
+    },
+  });
+}
+
+export function useVehiclesQuery() {
+  return useQuery({
+    queryKey: merchantQueryKeys.vehicles,
+    queryFn: fetchVehicles,
+  });
+}
+
+export function useAddVehicleMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: addVehicle,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: merchantQueryKeys.vehicles,
+      });
+    },
+  });
+}
+
+export function usePayoutHistoryInfiniteQuery() {
+  return useInfiniteQuery({
+    queryKey: merchantQueryKeys.payouts,
+    queryFn: async ({ pageParam }) =>
+      fetchPayoutHistory(typeof pageParam === "string" ? pageParam : undefined),
+    initialPageParam: "",
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  });
+}
+
+export function usePayoutDetailQuery(payoutId: string) {
+  return useQuery({
+    queryKey: merchantQueryKeys.payoutDetail(payoutId),
+    queryFn: () => fetchPayoutDetail(payoutId),
+    enabled: payoutId.length > 0,
+  });
 }

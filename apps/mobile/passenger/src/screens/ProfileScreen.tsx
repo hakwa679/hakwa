@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   FlatList,
@@ -25,46 +25,26 @@ type ProfileResponse = {
 };
 
 export function ProfileScreen() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<ProfileResponse | null>(null);
+  const profileQuery = useQuery({
+    queryKey: ["passenger-profile", "gamification"],
+    queryFn: async () => {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(`${API_URL}/api/me/gamification`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
 
-  useEffect(() => {
-    let alive = true;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const token = await SecureStore.getItemAsync("hakwa_token");
-        const res = await fetch(`${API_URL}/api/me/gamification`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!res.ok) {
-          throw new Error(`Failed to load profile (${res.status})`);
-        }
-        const body = (await res.json()) as ProfileResponse;
-        if (alive) {
-          setData(body);
-        }
-      } catch (err) {
-        if (alive) {
-          setError(
-            err instanceof Error ? err.message : "Failed to load profile",
-          );
-        }
-      } finally {
-        if (alive) {
-          setLoading(false);
-        }
+      if (!res.ok) {
+        throw new Error(`Failed to load profile (${res.status})`);
       }
-    }
 
-    load();
-    return () => {
-      alive = false;
-    };
-  }, []);
+      return (await res.json()) as ProfileResponse;
+    },
+  });
+
+  const loading = profileQuery.isPending;
+  const error =
+    profileQuery.error instanceof Error ? profileQuery.error.message : null;
+  const data = profileQuery.data ?? null;
 
   return (
     <View style={styles.container}>

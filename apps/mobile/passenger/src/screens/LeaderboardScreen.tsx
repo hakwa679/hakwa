@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   FlatList,
@@ -19,59 +19,40 @@ type LeaderboardEntry = {
 };
 
 export function LeaderboardScreen() {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const leaderboardQuery = useQuery({
+    queryKey: ["passenger-gamification", "leaderboard", 20],
+    queryFn: async () => {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(
+        `${API_URL}/api/gamification/leaderboard?limit=20`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
 
-  useEffect(() => {
-    let alive = true;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const token = await SecureStore.getItemAsync("hakwa_token");
-        const res = await fetch(
-          `${API_URL}/api/gamification/leaderboard?limit=20`,
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          },
-        );
-
-        if (!res.ok) {
-          throw new Error(`Failed to load leaderboard (${res.status})`);
-        }
-
-        const body = (await res.json()) as {
-          entries: LeaderboardEntry[];
-          currentUserId?: string;
-        };
-        if (alive) {
-          const mapped = (body.entries ?? []).map((entry) => ({
-            ...entry,
-            isCurrentUser:
-              entry.isCurrentUser ?? entry.userId === body.currentUserId,
-          }));
-          setEntries(mapped);
-        }
-      } catch (err) {
-        if (alive) {
-          setError(
-            err instanceof Error ? err.message : "Failed to load leaderboard",
-          );
-        }
-      } finally {
-        if (alive) {
-          setLoading(false);
-        }
+      if (!res.ok) {
+        throw new Error(`Failed to load leaderboard (${res.status})`);
       }
-    }
 
-    load();
-    return () => {
-      alive = false;
-    };
-  }, []);
+      const body = (await res.json()) as {
+        entries: LeaderboardEntry[];
+        currentUserId?: string;
+      };
+
+      return (body.entries ?? []).map((entry) => ({
+        ...entry,
+        isCurrentUser:
+          entry.isCurrentUser ?? entry.userId === body.currentUserId,
+      }));
+    },
+  });
+
+  const loading = leaderboardQuery.isPending;
+  const error =
+    leaderboardQuery.error instanceof Error
+      ? leaderboardQuery.error.message
+      : null;
+  const entries = leaderboardQuery.data ?? [];
 
   return (
     <View style={styles.container}>

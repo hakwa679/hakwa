@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   FlatList,
@@ -56,61 +56,46 @@ function formatDate(iso: string | undefined): string {
  * Shows gross credit amounts from `ride_payment` ledger entries.
  */
 export default function EarningsScreen() {
-  const [items, setItems] = useState<EarningsItem[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchEarnings = useCallback(
-    async (nextCursor: string | null, replace: boolean) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const token = await SecureStore.getItemAsync(TOKEN_KEY);
-        if (!token) {
-          setError("Not authenticated.");
-          return;
-        }
-
-        const params = new URLSearchParams({ limit: "20" });
-        if (nextCursor) params.append("cursor", nextCursor);
-
-        const res = await fetch(
-          `${API_URL}/api/driver/earnings?${params.toString()}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-
-        if (!res.ok) {
-          setError("Failed to load earnings. Please try again.");
-          return;
-        }
-
-        const data = (await res.json()) as EarningsResponse;
-        setItems((prev) => (replace ? data.items : [...prev, ...data.items]));
-        setCursor(data.nextCursor);
-        setHasMore(data.nextCursor !== null);
-      } catch {
-        setError("Network error. Please try again.");
-      } finally {
-        setLoading(false);
-        setInitialLoading(false);
+  const earningsQuery = useInfiniteQuery({
+    queryKey: ["driver-earnings", "list"],
+    queryFn: async ({ pageParam }) => {
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      if (!token) {
+        throw new Error("Not authenticated.");
       }
-    },
-    [],
-  );
 
-  // Initial load
-  useEffect(() => {
-    void fetchEarnings(null, true);
-  }, [fetchEarnings]);
+      const params = new URLSearchParams({ limit: "20" });
+      if (typeof pageParam === "string" && pageParam.length > 0) {
+        params.append("cursor", pageParam);
+      }
+
+      const res = await fetch(
+        `${API_URL}/api/driver/earnings?${params.toString()}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (!res.ok) {
+        throw new Error("Failed to load earnings. Please try again.");
+      }
+
+      return (await res.json()) as EarningsResponse;
+    },
+    initialPageParam: "",
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  });
+
+  const items = earningsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const hasMore = earningsQuery.hasNextPage;
+  const loading = earningsQuery.isFetchingNextPage;
+  const initialLoading = earningsQuery.isPending;
+  const error =
+    earningsQuery.error instanceof Error ? earningsQuery.error.message : null;
 
   function handleLoadMore() {
-    if (loading || !hasMore || !cursor) return;
-    void fetchEarnings(cursor, false);
+    if (loading || !hasMore) return;
+    void earningsQuery.fetchNextPage();
   }
 
   // -------------------------------------------------------------------------
@@ -135,8 +120,7 @@ export default function EarningsScreen() {
         <TouchableOpacity
           style={styles.retryButton}
           onPress={() => {
-            setInitialLoading(true);
-            void fetchEarnings(null, true);
+            void earningsQuery.refetch();
           }}
         >
           <Text style={styles.retryText}>Retry</Text>

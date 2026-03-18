@@ -5,9 +5,8 @@
  *
  * Saves to API via PATCH /api/merchants/me.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
-  View,
   Text,
   TextInput,
   Pressable,

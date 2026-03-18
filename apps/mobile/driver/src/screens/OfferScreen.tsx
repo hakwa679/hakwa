@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   Alert,
   StyleSheet,
@@ -38,8 +39,33 @@ interface Props {
  */
 export default function OfferScreen({ offer, onAccepted, onDeclined }: Props) {
   const [timeLeft, setTimeLeft] = useState(offer.timeoutSeconds);
-  const [loading, setLoading] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const acceptMutation = useMutation({
+    mutationFn: async () => {
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      const res = await fetch(
+        `${API_URL}/api/driver/bookings/${offer.tripId}/accept`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        },
+      );
+      return res;
+    },
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: async () => {
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      await fetch(`${API_URL}/api/driver/bookings/${offer.tripId}/decline`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    },
+  });
+
+  const loading = acceptMutation.isPending || declineMutation.isPending;
 
   // Countdown timer — auto-dismiss when reaches 0 (T025)
   useEffect(() => {
@@ -63,17 +89,9 @@ export default function OfferScreen({ offer, onAccepted, onDeclined }: Props) {
 
   const handleAccept = useCallback(async () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    setLoading(true);
 
     try {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY);
-      const res = await fetch(
-        `${API_URL}/api/driver/bookings/${offer.tripId}/accept`,
-        {
-          method: "POST",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        },
-      );
+      const res = await acceptMutation.mutateAsync();
 
       if (res.ok) {
         onAccepted(
@@ -93,24 +111,18 @@ export default function OfferScreen({ offer, onAccepted, onDeclined }: Props) {
         onDeclined();
       } else {
         Alert.alert("Error", "Could not accept the booking. Please try again.");
-        setLoading(false);
       }
     } catch {
       Alert.alert("Error", "Network error. Please try again.");
-      setLoading(false);
     }
-  }, [offer, onAccepted, onDeclined]);
+  }, [acceptMutation, offer, onAccepted, onDeclined]);
 
   const handleDecline = useCallback(
     async (isAutoDecline = false) => {
       if (intervalRef.current) clearInterval(intervalRef.current);
 
       try {
-        const token = await SecureStore.getItemAsync(TOKEN_KEY);
-        await fetch(`${API_URL}/api/driver/bookings/${offer.tripId}/decline`, {
-          method: "POST",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        await declineMutation.mutateAsync();
       } catch {
         // Best-effort — decline is fire-and-forget
       }
@@ -123,7 +135,7 @@ export default function OfferScreen({ offer, onAccepted, onDeclined }: Props) {
         onDeclined();
       }
     },
-    [offer.tripId, onDeclined],
+    [declineMutation, onDeclined],
   );
 
   const timerColor =

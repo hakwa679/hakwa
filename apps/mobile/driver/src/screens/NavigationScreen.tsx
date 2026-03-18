@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Alert,
@@ -99,28 +100,98 @@ export default function NavigationScreen({
     return SecureStore.getItemAsync(TOKEN_KEY);
   }
 
+  const postLocationMutation = useMutation({
+    mutationFn: async ({
+      lat,
+      lng,
+      heading,
+    }: {
+      lat: number;
+      lng: number;
+      heading: number;
+    }) => {
+      const token = await getToken();
+      if (!token) return;
+
+      await fetch(`${API_URL}/api/driver/location`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ lat, lng, heading }),
+      });
+    },
+  });
+
+  const arriveMutation = useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("Missing auth token");
+      const res = await fetch(`${API_URL}/api/driver/trips/${tripId}/arrive`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = (await res.json()) as { message?: string };
+        throw new Error(body.message ?? "Failed to mark arrived.");
+      }
+    },
+  });
+
+  const startMutation = useMutation({
+    mutationFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error("Missing auth token");
+      const res = await fetch(`${API_URL}/api/driver/trips/${tripId}/start`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const body = (await res.json()) as { message?: string };
+        throw new Error(body.message ?? "Failed to start trip.");
+      }
+    },
+  });
+
+  const completeMutation = useMutation({
+    mutationFn: async (actualDistanceKm: number) => {
+      const token = await getToken();
+      if (!token) throw new Error("Missing auth token");
+      const res = await fetch(
+        `${API_URL}/api/driver/trips/${tripId}/complete`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ actualDistanceKm }),
+        },
+      );
+
+      if (!res.ok) {
+        const body = (await res.json()) as { message?: string };
+        throw new Error(body.message ?? "Failed to complete trip.");
+      }
+
+      return (await res.json()) as CompletionResult;
+    },
+  });
+
   // -------------------------------------------------------------------------
   // GPS helpers (T019)
   // -------------------------------------------------------------------------
 
   const postLocation = useCallback(
     async (lat: number, lng: number, heading: number) => {
-      const token = await getToken();
-      if (!token) return;
       try {
-        await fetch(`${API_URL}/api/driver/location`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ lat, lng, heading }),
-        });
+        await postLocationMutation.mutateAsync({ lat, lng, heading });
       } catch {
         // Tolerate network hiccups during active trip
       }
     },
-    [],
+    [postLocationMutation],
   );
 
   // Start/stop GPS watch when entering or leaving `in_progress`
@@ -178,55 +249,39 @@ export default function NavigationScreen({
   // -------------------------------------------------------------------------
 
   async function handleArrive() {
-    const token = await getToken();
-    if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/driver/trips/${tripId}/arrive`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const body = (await res.json()) as { message?: string };
-        Alert.alert("Error", body.message ?? "Failed to mark arrived.");
-        return;
-      }
+      await arriveMutation.mutateAsync();
       setPhase("driver_arrived");
-    } catch {
-      Alert.alert("Error", "Network error. Please retry.");
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Network error. Please retry.",
+      );
     } finally {
       setLoading(false);
     }
   }
 
   async function handleStart() {
-    const token = await getToken();
-    if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/driver/trips/${tripId}/start`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const body = (await res.json()) as { message?: string };
-        Alert.alert("Error", body.message ?? "Failed to start trip.");
-        return;
-      }
+      await startMutation.mutateAsync();
       // Reset distance accumulator at trip start
       lastPosRef.current = null;
       setAccumulatedKm(0);
       setPhase("in_progress");
-    } catch {
-      Alert.alert("Error", "Network error. Please retry.");
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Network error. Please retry.",
+      );
     } finally {
       setLoading(false);
     }
   }
 
   async function handleComplete() {
-    const token = await getToken();
-    if (!token) return;
     setLoading(true);
 
     // Stop GPS before completing
@@ -236,31 +291,16 @@ export default function NavigationScreen({
     }
 
     try {
-      const res = await fetch(
-        `${API_URL}/api/driver/trips/${tripId}/complete`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            actualDistanceKm: parseFloat(accumulatedKm.toFixed(2)),
-          }),
-        },
+      const data = await completeMutation.mutateAsync(
+        parseFloat(accumulatedKm.toFixed(2)),
       );
-      if (!res.ok) {
-        const body = (await res.json()) as { message?: string };
-        Alert.alert("Error", body.message ?? "Failed to complete trip.");
-        // Re-enter in_progress so driver can retry
-        setPhase("in_progress");
-        return;
-      }
-      const data = (await res.json()) as CompletionResult;
       setCompletionResult(data);
       setPhase("completed");
-    } catch {
-      Alert.alert("Error", "Network error. Please retry.");
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Network error. Please retry.",
+      );
       setPhase("in_progress");
     } finally {
       setLoading(false);

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
   StyleSheet,
@@ -31,8 +32,46 @@ interface Props {
  * `PATCH /api/driver/availability`.
  */
 export default function AvailabilityScreen({ onStatusChange }: Props) {
-  const [status, setStatus] = useState<AvailabilityStatus>("offline");
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const availabilityQueryKey = ["driver", "availability"] as const;
+  const { data: status = "offline" } = useQuery({
+    queryKey: availabilityQueryKey,
+    queryFn: async () => "offline" as AvailabilityStatus,
+    staleTime: Infinity,
+  });
+
+  const updateAvailabilityMutation = useMutation({
+    mutationFn: async (nextStatus: AvailabilityStatus) => {
+      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      const res = await fetch(`${API_URL}/api/driver/availability`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+
+      if (res.status === 204) {
+        return nextStatus;
+      }
+
+      if (res.status === 409) {
+        throw new Error("on_trip");
+      }
+
+      throw new Error("failed");
+    },
+    onSuccess: (nextStatus) => {
+      queryClient.setQueryData<AvailabilityStatus>(
+        availabilityQueryKey,
+        nextStatus,
+      );
+      onStatusChange?.(nextStatus);
+    },
+  });
+
+  const loading = updateAvailabilityMutation.isPending;
 
   // Request location permission when going online (Android)
   async function requestLocationPermission(): Promise<boolean> {
@@ -76,26 +115,13 @@ export default function AvailabilityScreen({ onStatusChange }: Props) {
         }
       }
 
-      setLoading(true);
-
       try {
-        const token = await SecureStore.getItemAsync(TOKEN_KEY);
-        const res = await fetch(`${API_URL}/api/driver/availability`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ status: goOnline ? "available" : "offline" }),
-        });
-
-        if (res.status === 204) {
-          const newStatus: AvailabilityStatus = goOnline
-            ? "available"
-            : "offline";
-          setStatus(newStatus);
-          onStatusChange?.(newStatus);
-        } else if (res.status === 409) {
+        const newStatus: AvailabilityStatus = goOnline
+          ? "available"
+          : "offline";
+        await updateAvailabilityMutation.mutateAsync(newStatus);
+      } catch (error) {
+        if (error instanceof Error && error.message === "on_trip") {
           Alert.alert("Cannot go offline", "You are currently on a trip.");
         } else {
           Alert.alert(
@@ -103,13 +129,9 @@ export default function AvailabilityScreen({ onStatusChange }: Props) {
             "Failed to update availability. Please try again.",
           );
         }
-      } catch {
-        Alert.alert("Error", "Network error. Please check your connection.");
-      } finally {
-        setLoading(false);
       }
     },
-    [status, onStatusChange],
+    [status, updateAvailabilityMutation],
   );
 
   const statusColor =

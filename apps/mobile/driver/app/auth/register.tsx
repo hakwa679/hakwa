@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   TextInput,
   Text,
@@ -25,18 +26,9 @@ export default function RegisterScreen() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const pwError = passwordStrengthError(password);
-  const canSubmit =
-    name.trim().length > 0 && email.trim().length > 0 && password.length >= 8;
-
-  async function handleRegister() {
-    if (!canSubmit || loading) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`${API_URL}/auth/sign-up/email`, {
+  const registerMutation = useMutation({
+    mutationFn: async () => {
+      return fetch(`${API_URL}/auth/sign-up/email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -47,6 +39,20 @@ export default function RegisterScreen() {
           phone: phone.trim() || undefined,
         }),
       });
+    },
+  });
+
+  const loading = registerMutation.isPending;
+
+  const pwError = passwordStrengthError(password);
+  const canSubmit =
+    name.trim().length > 0 && email.trim().length > 0 && password.length >= 8;
+
+  async function handleRegister() {
+    if (!canSubmit || loading) return;
+    setError(null);
+    try {
+      const res = await registerMutation.mutateAsync();
       if (res.status === 200 || res.status === 201) {
         router.replace("/auth/verify-email-sent");
       } else if (res.status === 409) {
@@ -62,8 +68,6 @@ export default function RegisterScreen() {
       }
     } catch {
       setError("Network error. Please check your connection and try again.");
-    } finally {
-      setLoading(false);
     }
   }
 

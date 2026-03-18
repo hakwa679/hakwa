@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Alert,
@@ -36,21 +37,22 @@ export default function BookingScreen() {
   const [destinationLng, setDestinationLng] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
 
-  const [fareEstimate, setFareEstimate] = useState<FareEstimate | null>(null);
-  const [estimating, setEstimating] = useState(false);
-  const [booking, setBooking] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
 
   // T029 — basic offline detection via failed fetch
   const destinationReady =
     destinationLat.trim() !== "" && destinationLng.trim() !== "";
-
-  const fetchFareEstimate = useCallback(async () => {
-    if (!destinationReady) return;
-    setEstimating(true);
-    setFareEstimate(null);
-
-    try {
+  const fareEstimateQuery = useQuery({
+    queryKey: [
+      "passenger-booking",
+      "fare-estimate",
+      pickupLat,
+      pickupLng,
+      destinationLat,
+      destinationLng,
+    ],
+    enabled: destinationReady,
+    queryFn: async () => {
       const token = await SecureStore.getItemAsync("hakwa_token");
       const res = await fetch(`${API_URL}/api/bookings/fare-estimate`, {
         method: "POST",
@@ -71,35 +73,12 @@ export default function BookingScreen() {
         throw new Error(err.message ?? "Failed to get fare estimate");
       }
 
-      const data = (await res.json()) as FareEstimate;
-      setFareEstimate(data);
-      setIsOffline(false);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Network error";
-      if (
-        message.toLowerCase().includes("network") ||
-        message.toLowerCase().includes("fetch")
-      ) {
-        setIsOffline(true);
-      } else {
-        Alert.alert("Fare estimate", message);
-      }
-    } finally {
-      setEstimating(false);
-    }
-  }, [pickupLat, pickupLng, destinationLat, destinationLng, destinationReady]);
+      return (await res.json()) as FareEstimate;
+    },
+  });
 
-  useEffect(() => {
-    if (destinationReady) {
-      fetchFareEstimate();
-    }
-  }, [fetchFareEstimate, destinationReady]);
-
-  async function handleBook() {
-    if (!fareEstimate || isOffline) return;
-    setBooking(true);
-
-    try {
+  const bookingMutation = useMutation({
+    mutationFn: async () => {
       const token = await SecureStore.getItemAsync("hakwa_token");
       const res = await fetch(`${API_URL}/api/bookings`, {
         method: "POST",
@@ -122,7 +101,40 @@ export default function BookingScreen() {
         throw new Error(err.message ?? "Booking failed");
       }
 
-      const data = (await res.json()) as { tripId: string };
+      return (await res.json()) as { tripId: string };
+    },
+  });
+
+  const fareEstimate = fareEstimateQuery.data ?? null;
+  const estimating = fareEstimateQuery.isFetching;
+  const booking = bookingMutation.isPending;
+
+  useEffect(() => {
+    if (!fareEstimateQuery.error) {
+      setIsOffline(false);
+      return;
+    }
+
+    const message =
+      fareEstimateQuery.error instanceof Error
+        ? fareEstimateQuery.error.message
+        : "Network error";
+
+    if (
+      message.toLowerCase().includes("network") ||
+      message.toLowerCase().includes("fetch")
+    ) {
+      setIsOffline(true);
+    } else {
+      Alert.alert("Fare estimate", message);
+    }
+  }, [fareEstimateQuery.error]);
+
+  async function handleBook() {
+    if (!fareEstimate || isOffline) return;
+
+    try {
+      const data = await bookingMutation.mutateAsync();
       router.replace({
         pathname: "/searching",
         params: { tripId: data.tripId },
@@ -132,8 +144,6 @@ export default function BookingScreen() {
         "Booking failed",
         err instanceof Error ? err.message : "An error occurred",
       );
-    } finally {
-      setBooking(false);
     }
   }
 

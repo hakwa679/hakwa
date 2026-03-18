@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { AppState, type AppStateStatus, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
@@ -11,6 +12,29 @@ export function usePushRegistration(
   onDeepLink?: (data: Record<string, unknown>) => void,
 ): void {
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const registerDeviceMutation = useMutation({
+    mutationFn: async ({
+      authToken,
+      pushToken,
+    }: {
+      authToken: string;
+      pushToken: string;
+    }) => {
+      const response = await fetch(`${API_URL}/api/devices`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          pushToken,
+          platform: Platform.OS === "ios" ? "ios" : "android",
+        }),
+      });
+
+      return response.ok;
+    },
+  });
 
   useEffect(() => {
     let active = true;
@@ -35,19 +59,12 @@ export function usePushRegistration(
           await SecureStore.getItemAsync(PUSH_TOKEN_KEY);
         if (currentStoredToken === pushToken) return;
 
-        const response = await fetch(`${API_URL}/api/devices`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({
-            pushToken,
-            platform: Platform.OS === "ios" ? "ios" : "android",
-          }),
+        const ok = await registerDeviceMutation.mutateAsync({
+          authToken,
+          pushToken,
         });
 
-        if (response.ok) {
+        if (ok) {
           await SecureStore.setItemAsync(PUSH_TOKEN_KEY, pushToken);
         }
       } catch {
@@ -81,5 +98,5 @@ export function usePushRegistration(
       sub.remove();
       responseSub.remove();
     };
-  }, [onDeepLink]);
+  }, [onDeepLink, registerDeviceMutation]);
 }

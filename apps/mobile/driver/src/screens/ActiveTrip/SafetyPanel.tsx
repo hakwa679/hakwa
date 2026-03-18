@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { useSilentSOS } from "../../hooks/useSilentSOS";
@@ -12,10 +13,38 @@ interface SafetyPanelProps {
 
 export default function DriverSafetyPanel({ tripId }: SafetyPanelProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [isSending, setIsSending] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const { triggerSilentSOS, isSubmitting } = useSilentSOS(tripId);
+  const sosMutation = useMutation({
+    mutationFn: async (silent: boolean) => {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(`${API_URL}/api/v1/safety/sos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          silent,
+          ...(tripId ? { tripId } : {}),
+        }),
+      });
+
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(payload?.message ?? "SOS request failed.");
+      }
+
+      return (await res.json().catch(() => null)) as {
+        referenceCode?: string;
+      } | null;
+    },
+  });
+
+  const isSending = sosMutation.isPending;
 
   const emergencyLine = useMemo(
     () => "Police 917 | Ambulance 911 | Fire 910",
@@ -46,32 +75,9 @@ export default function DriverSafetyPanel({ tripId }: SafetyPanelProps) {
 
   async function triggerSos(silent: boolean) {
     setCountdown(null);
-    setIsSending(true);
 
     try {
-      const token = await SecureStore.getItemAsync("hakwa_token");
-      const res = await fetch(`${API_URL}/api/v1/safety/sos`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          silent,
-          ...(tripId ? { tripId } : {}),
-        }),
-      });
-
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as {
-          message?: string;
-        } | null;
-        throw new Error(payload?.message ?? "SOS request failed.");
-      }
-
-      const data = (await res.json().catch(() => null)) as {
-        referenceCode?: string;
-      } | null;
+      const data = await sosMutation.mutateAsync(silent);
 
       Alert.alert(
         "SOS sent",
@@ -84,8 +90,6 @@ export default function DriverSafetyPanel({ tripId }: SafetyPanelProps) {
         "SOS failed",
         error instanceof Error ? error.message : "Could not send SOS.",
       );
-    } finally {
-      setIsSending(false);
     }
   }
 

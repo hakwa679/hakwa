@@ -7,6 +7,11 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
   ActivityIndicator,
   FlatList,
   Pressable,
@@ -50,98 +55,71 @@ async function authHeaders(): Promise<Record<string, string>> {
 
 export default function WalletScreen() {
   const router = useRouter();
-  const [balance, setBalance] = useState<WalletBalance | null>(null);
-  const [items, setItems] = useState<LedgerItem[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loadingBalance, setLoadingBalance] = useState(true);
-  const [loadingLedger, setLoadingLedger] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const balanceQueryKey = ["merchant-wallet", "balance"] as const;
+  const ledgerQueryKey = ["merchant-wallet", "ledger"] as const;
 
-  // ---------------------------------------------------------------------------
-  // Fetch balance
-  // ---------------------------------------------------------------------------
-  const fetchBalance = useCallback(async () => {
-    try {
+  const balanceQuery = useQuery({
+    queryKey: balanceQueryKey,
+    queryFn: async () => {
       const headers = await authHeaders();
       const res = await fetch(`${API_URL}/api/merchant/wallet/balance`, {
         headers,
       });
-      if (res.ok) {
-        setBalance((await res.json()) as WalletBalance);
-      }
-    } catch {
-      // best-effort
-    } finally {
-      setLoadingBalance(false);
-    }
-  }, []);
 
-  // ---------------------------------------------------------------------------
-  // Fetch ledger (first page)
-  // ---------------------------------------------------------------------------
-  const fetchLedger = useCallback(async () => {
-    try {
-      const headers = await authHeaders();
-      const res = await fetch(
-        `${API_URL}/api/merchant/wallet/ledger?limit=20`,
-        {
-          headers,
-        },
-      );
-      if (res.ok) {
-        const page = (await res.json()) as LedgerPage;
-        setItems(page.items);
-        setNextCursor(page.nextCursor);
+      if (!res.ok) {
+        throw new Error("Failed to load wallet balance");
       }
-    } catch {
-      // best-effort
-    } finally {
-      setLoadingLedger(false);
-    }
-  }, []);
 
-  // ---------------------------------------------------------------------------
-  // Load more (cursor pagination)
-  // ---------------------------------------------------------------------------
-  const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    try {
+      return (await res.json()) as WalletBalance;
+    },
+  });
+
+  const ledgerQuery = useInfiniteQuery({
+    queryKey: ledgerQueryKey,
+    queryFn: async ({ pageParam }) => {
       const headers = await authHeaders();
+      const params = new URLSearchParams({ limit: "20" });
+      if (typeof pageParam === "string" && pageParam.length > 0) {
+        params.set("cursor", pageParam);
+      }
       const res = await fetch(
-        `${API_URL}/api/merchant/wallet/ledger?cursor=${encodeURIComponent(nextCursor)}&limit=20`,
+        `${API_URL}/api/merchant/wallet/ledger?${params.toString()}`,
         { headers },
       );
-      if (res.ok) {
-        const page = (await res.json()) as LedgerPage;
-        setItems((prev) => [...prev, ...page.items]);
-        setNextCursor(page.nextCursor);
+
+      if (!res.ok) {
+        throw new Error("Failed to load wallet ledger");
       }
-    } catch {
-      // best-effort
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [nextCursor, loadingMore]);
+
+      return (await res.json()) as LedgerPage;
+    },
+    initialPageParam: "",
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  });
+
+  const balance = balanceQuery.data ?? null;
+  const items = ledgerQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const loadingBalance = balanceQuery.isPending;
+  const loadingLedger = ledgerQuery.isPending;
+  const loadingMore = ledgerQuery.isFetchingNextPage;
+  const hasMore = ledgerQuery.hasNextPage;
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore || loadingMore) return;
+    await ledgerQuery.fetchNextPage();
+  }, [hasMore, ledgerQuery, loadingMore]);
 
   // ---------------------------------------------------------------------------
   // Pull-to-refresh
   // ---------------------------------------------------------------------------
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([fetchBalance(), fetchLedger()]);
+    await Promise.all([balanceQuery.refetch(), ledgerQuery.refetch()]);
     setRefreshing(false);
-  }, [fetchBalance, fetchLedger]);
-
-  // ---------------------------------------------------------------------------
-  // Initial load
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    void fetchBalance();
-    void fetchLedger();
-  }, [fetchBalance, fetchLedger]);
+  }, [balanceQuery, ledgerQuery]);
 
   // ---------------------------------------------------------------------------
   // T017: Real-time WebSocket — refresh balance on `balance_updated` event
@@ -162,7 +140,7 @@ export default function WalletScreen() {
         try {
           const msg = JSON.parse(event.data as string) as { type?: string };
           if (msg.type === "balance_updated") {
-            void fetchBalance();
+            void queryClient.invalidateQueries({ queryKey: balanceQueryKey });
           }
         } catch {
           // ignore malformed messages
@@ -180,7 +158,7 @@ export default function WalletScreen() {
       clearTimeout(reconnectTimer);
       wsRef.current?.close();
     };
-  }, [fetchBalance]);
+  }, [queryClient]);
 
   // ---------------------------------------------------------------------------
   // Render helpers
@@ -279,7 +257,7 @@ export default function WalletScreen() {
           )
         }
         ListFooterComponent={
-          loadingMore ? (
+          hasMore && loadingMore ? (
             <ActivityIndicator
               size="small"
               color="#0a7ea4"

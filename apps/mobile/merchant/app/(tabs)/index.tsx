@@ -5,6 +5,7 @@
  *   - If complete → shows status banner reflecting current review state
  */
 import { useCallback, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -18,6 +19,15 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
 export default function HomeScreen() {
   const router = useRouter();
   const [profile, setProfile] = useState<MerchantProfile | null>(null);
+  const signOutMutation = useMutation({
+    mutationFn: async () => {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      await fetch(`${API_URL}/auth/sign-out`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    },
+  });
 
   // T018: On every focus check onboarding status
   useFocusEffect(
@@ -47,11 +57,7 @@ export default function HomeScreen() {
 
   async function handleSignOut() {
     try {
-      const token = await SecureStore.getItemAsync("hakwa_token");
-      await fetch(`${API_URL}/auth/sign-out`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      await signOutMutation.mutateAsync();
     } catch {
       // best-effort
     } finally {

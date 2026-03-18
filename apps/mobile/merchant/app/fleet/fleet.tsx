@@ -3,7 +3,7 @@
  * Lists all vehicles for the merchant.
  * Shows active/inactive status and links to add-vehicle.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   View,
   Text,

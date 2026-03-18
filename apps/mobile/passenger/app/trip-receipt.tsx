@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Alert,
@@ -31,29 +31,37 @@ interface TripDetails {
 export default function TripReceiptScreen() {
   const router = useRouter();
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
-  const [trip, setTrip] = useState<TripDetails | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [emailing, setEmailing] = useState(false);
+  const receiptQuery = useQuery({
+    queryKey: ["passenger", "trip-receipt", tripId],
+    enabled: !!tripId,
+    queryFn: async () => {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Could not load receipt");
+      return (await res.json()) as TripDetails;
+    },
+  });
 
-  useEffect(() => {
-    if (!tripId) return;
-    (async () => {
-      try {
-        const token = await SecureStore.getItemAsync("hakwa_token");
-        const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error("Could not load receipt");
-        const data = await res.json();
-        setTrip(data);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setLoading(false);
+  const emailMutation = useMutation({
+    mutationFn: async () => {
+      const token = await SecureStore.getItemAsync("hakwa_token");
+      const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt/email`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        throw new Error("Could not queue receipt email. Please try again.");
       }
-    })();
-  }, [tripId]);
+    },
+  });
+
+  const trip = receiptQuery.data ?? null;
+  const loading = receiptQuery.isPending;
+  const error =
+    receiptQuery.error instanceof Error ? receiptQuery.error.message : null;
+  const emailing = emailMutation.isPending;
 
   if (loading) {
     return (
@@ -103,28 +111,14 @@ export default function TripReceiptScreen() {
 
   const onEmailReceipt = async () => {
     if (!tripId || emailing) return;
-    setEmailing(true);
     try {
-      const token = await SecureStore.getItemAsync("hakwa_token");
-      const res = await fetch(`${API_URL}/api/trips/${tripId}/receipt/email`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) {
-        Alert.alert(
-          "Receipt",
-          "Could not queue receipt email. Please try again.",
-        );
-        return;
-      }
+      await emailMutation.mutateAsync();
       Alert.alert("Receipt", "Your receipt email has been queued.");
     } catch {
       Alert.alert(
         "Receipt",
         "Could not queue receipt email. Please try again.",
       );
-    } finally {
-      setEmailing(false);
     }
   };
 

@@ -19,7 +19,6 @@ import {
   fetchBankAccount,
   upsertBankAccount,
   fetchMerchantProfile,
-  type BankAccountData,
 } from "@/hooks/use-merchant-api";
 
 export default function PayoutAccountScreen() {
